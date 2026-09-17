@@ -1,0 +1,2513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Naruto: Shadow Run — PRO</title>
+<style>
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0}
+body{
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:
+    radial-gradient(circle at 50% 20%,#24365e 0%,#10172b 42%,#05070d 100%);
+  font-family:Arial,Helvetica,sans-serif;
+}
+.shell{
+  width:min(96vw,1200px);
+  position:relative;
+}
+canvas{
+  width:100%;
+  height:auto;
+  display:block;
+  aspect-ratio:16/9;
+  border:2px solid rgba(220,238,255,.85);
+  border-radius:16px;
+  background:#090d18;
+  box-shadow:
+    0 25px 80px rgba(0,0,0,.75),
+    0 0 55px rgba(80,160,255,.14);
+}
+.controls{
+  position:absolute;
+  left:18px;
+  bottom:12px;
+  color:rgba(235,243,255,.75);
+  font-size:12px;
+  text-shadow:0 2px 5px #000;
+  pointer-events:none;
+}
+.touch-controls{
+  display:none;
+}
+@media (pointer:coarse), (max-width:700px){
+  body{
+    align-items:flex-start;
+    padding-top:10px;
+  }
+  .shell{
+    width:100vw;
+  }
+  canvas{
+    border-radius:10px;
+  }
+  .controls{
+    display:none;
+  }
+  .touch-controls{
+    position:fixed;
+    inset:auto 0 12px;
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    padding:0 14px;
+    pointer-events:none;
+    z-index:5;
+  }
+  .touch-group{
+    display:flex;
+    gap:8px;
+    pointer-events:auto;
+  }
+  .joystick{
+    position:relative;
+    width:116px;
+    height:116px;
+    border:2px solid rgba(255,255,255,.28);
+    border-radius:50%;
+    background:rgba(10,18,38,.68);
+    box-shadow:0 5px 18px rgba(0,0,0,.4);
+    pointer-events:auto;
+    touch-action:none;
+    flex:0 0 116px;
+  }
+  .joystick::before{
+    content:"";
+    position:absolute;
+    inset:25px;
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:50%;
+  }
+  .joystick-knob{
+    position:absolute;
+    left:34px;
+    top:34px;
+    width:44px;
+    height:44px;
+    border:1px solid rgba(255,255,255,.5);
+    border-radius:50%;
+    background:rgba(185,55,85,.86);
+    box-shadow:0 3px 12px rgba(0,0,0,.45);
+    pointer-events:none;
+  }
+  .touch-button{
+    width:54px;
+    height:54px;
+    border:1px solid rgba(255,255,255,.35);
+    border-radius:14px;
+    color:#fff;
+    background:rgba(10,18,38,.82);
+    box-shadow:0 5px 18px rgba(0,0,0,.4);
+    font:bold 18px Arial,sans-serif;
+    touch-action:none;
+    user-select:none;
+  }
+  .touch-button:active{
+    background:#b63855;
+    transform:translateY(2px);
+  }
+  .touch-button.cooldown{
+    opacity:.5;
+    filter:saturate(.45);
+  }
+  .power-button{
+    font-size:13px;
+    border-radius:50%;
+    width:62px;
+    height:62px;
+    padding:0;
+  }
+  @media (max-width:430px){
+    .touch-controls{
+      padding:0 10px;
+    }
+    .joystick{
+      width:88px;
+      height:88px;
+      flex-basis:88px;
+    }
+    .joystick::before{
+      inset:19px;
+    }
+    .joystick-knob{
+      left:25px;
+      top:25px;
+      width:36px;
+      height:36px;
+    }
+    .power-button{
+      width:48px;
+      height:48px;
+      font-size:11px;
+    }
+    .touch-group{
+      gap:6px;
+    }
+  }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+<canvas id="game" width="1200" height="675"></canvas>
+<div class="controls">A / D or ← / → move · Space / W / ↑ jump · J Rasengan · F Fire Style · K Nine-Tails (2 sec, 6 sec cooldown) · R restart</div>
+</div>
+<div class="touch-controls" aria-label="Mobile game controls">
+  <div class="joystick" id="joystick" aria-label="Move joystick">
+    <div class="joystick-knob" id="joystick-knob"></div>
+  </div>
+  <div class="touch-group">
+    <button class="touch-button power-button" data-action="jump" aria-label="Jump">JUMP</button>
+    <button class="touch-button power-button" data-action="rasengan" aria-label="Rasengan">RAS</button>
+    <button class="touch-button power-button" data-action="fire" aria-label="Fire Style">FIRE</button>
+    <button class="touch-button power-button" data-action="nine" aria-label="Nine-Tails">9T</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* =========================================================
+   NARUTO: SHADOW RUN — PRO
+   Important physics fix:
+   - Collision is calculated using previous Y position.
+   - Player can only land while falling.
+   - Falling past the world triggers a safe respawn.
+   - Character spawn positions are calculated from platform tops.
+   ========================================================= */
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const GAME = {
+  width: canvas.width,
+  height: canvas.height,
+  gravity: 0.68,
+  maxFallSpeed: 15
+};
+
+ctx.imageSmoothingEnabled = true;
+
+const images = {
+  naruto: new Image(),
+  pain: new Image()
+};
+
+function loadCharacterImage(image,path,name){
+  image.onload=()=>draw();
+  image.onerror=()=>console.error(`Could not load ${name}: ${path}`);
+  image.src=new URL(path,document.baseURI).href;
+}
+
+loadCharacterImage(images.naruto,"assets/naruto.jpg","Naruto");
+loadCharacterImage(images.pain,"assets/pain.jpg","Pain");
+
+const keys = Object.create(null);
+const particles = [];
+const projectiles = [];
+const enemyProjectiles = [];
+const fireballs = [];
+const sounds = {
+  background: new Audio("sounds/mixkit-sports-highlights-51.mp3"),
+  nineTails: new Audio("sounds/mixkit-body-cutting-impact-2199.wav"),
+  painAttack: new Audio("sounds/mixkit-body-cutting-impact-2199.wav")
+};
+
+sounds.background.loop=true;
+sounds.background.volume=.12;
+sounds.background.preload="auto";
+sounds.nineTails.preload="auto";
+sounds.painAttack.preload="auto";
+sounds.background.load();
+sounds.nineTails.load();
+sounds.painAttack.load();
+
+function playSound(sound){
+  if(!sound || !sound.src){
+    return;
+  }
+
+  sound.currentTime=0;
+  sound.volume=.7;
+  sound.play().catch(()=>{});
+}
+
+function playPainAttackSound(){
+  if(painSoundCooldown>0){
+    return;
+  }
+
+  painSoundCooldown=24;
+  playSound(sounds.painAttack);
+}
+let musicContext=null;
+let musicTimer=null;
+let backgroundFadeTimer=null;
+
+let score = 0;
+let state = "playing";
+let frame = 0;
+let shake = 0;
+let countdownFrames = 0;
+let painSoundCooldown = 0;
+
+/* -------------------------
+   World
+------------------------- */
+
+const platforms = [
+  {x:0,   y:590, width:1200, height:85, type:"ground"},
+  {x:70,  y:465, width:220,  height:22, type:"wood"},
+  {x:350, y:375, width:220,  height:22, type:"wood"},
+  {x:650, y:285, width:220,  height:22, type:"wood"},
+  {x:930, y:435, width:190,  height:22, type:"wood"}
+];
+
+const orbs = [
+  {x:190,y:420,phase:0,collected:false},
+  {x:465,y:330,phase:1,collected:false},
+  {x:765,y:240,phase:2,collected:false},
+  {x:1020,y:390,phase:3,collected:false}
+];
+
+const stars = Array.from({length:140},()=>({
+  x:Math.random()*GAME.width,
+  y:Math.random()*GAME.height*.58,
+  r:Math.random()*1.5+.25,
+  phase:Math.random()*Math.PI*2,
+  speed:Math.random()*.035+.008
+}));
+
+/* -------------------------
+   Characters
+------------------------- */
+
+const player = {
+  width:66,
+  height:92,
+
+  x:90,
+  y:0,
+  previousY:0,
+
+  vx:0,
+  vy:0,
+
+  acceleration:.72,
+  maxSpeed:6,
+  friction:.80,
+
+  jumpPower:-14.5,
+  grounded:false,
+
+  direction:1,
+
+  hp:120,
+  maxHp:120,
+
+  attackCooldown:0,
+  fireCooldown:0,
+  invulnerable:0,
+  nineTailsTimer:0,
+  nineTailsCooldown:0,
+  attackPose:0,
+
+  spawnX:90
+};
+
+const boss = {
+  width:72,
+  height:96,
+
+  x:900,
+  y:0,
+
+  vx:1.45,
+  minX:720,
+  maxX:1090,
+
+  hp:100,
+  maxHp:100,
+
+  hitFlash:0,
+  attackCooldown:0,
+  speed:1.8,
+  vy:0,
+  previousY:0,
+  grounded:true,
+  jumpCooldown:90
+};
+
+/* -------------------------
+   Utility
+------------------------- */
+
+function clamp(value,min,max){
+  return Math.max(min,Math.min(max,value));
+}
+
+function rectsOverlap(a,b){
+  return (
+    a.x < b.x+b.width &&
+    a.x+a.width > b.x &&
+    a.y < b.y+b.height &&
+    a.y+a.height > b.y
+  );
+}
+
+function getGroundY(body){
+  return platforms[0].y-body.height;
+}
+
+function respawnPlayer(){
+  player.x=player.spawnX;
+  player.y=getGroundY(player);
+  player.previousY=player.y;
+  player.vx=0;
+  player.vy=0;
+  player.grounded=true;
+}
+
+function createParticle(x,y,type){
+  const angle=Math.random()*Math.PI*2;
+  const speed=Math.random()*4+1;
+
+  particles.push({
+    x,
+    y,
+    vx:Math.cos(angle)*speed,
+    vy:Math.sin(angle)*speed,
+    size:Math.random()*4+2,
+    life:1,
+    type
+  });
+}
+
+function burst(x,y,count,type){
+  for(let i=0;i<count;i++){
+    createParticle(x,y,type);
+  }
+}
+
+function startBackgroundMusic(){
+  if(backgroundFadeTimer){
+    return;
+  }
+
+  sounds.background.volume=0;
+  sounds.background.play().catch(()=>{});
+
+  let volume=0;
+  backgroundFadeTimer=setInterval(()=>{
+    volume=Math.min(.12,volume+.01);
+    sounds.background.volume=volume;
+
+    if(volume>=.12){
+      clearInterval(backgroundFadeTimer);
+      backgroundFadeTimer=null;
+    }
+  },120);
+}
+
+/* -------------------------
+   Input
+------------------------- */
+
+window.addEventListener("keydown",event=>{
+  startBackgroundMusic();
+  const key=event.key.toLowerCase();
+  keys[key]=true;
+
+  if([
+    "arrowleft",
+    "arrowright",
+    "arrowup",
+    " ",
+    "w",
+    "a",
+    "d",
+    "j",
+    "k",
+    "f"
+  ].includes(key)){
+    event.preventDefault();
+  }
+
+  if(
+    (key===" " || key==="w" || key==="arrowup") &&
+    player.grounded &&
+    state==="playing"
+  ){
+    player.vy=player.jumpPower;
+    player.grounded=false;
+
+    burst(
+      player.x+player.width/2,
+      player.y+player.height,
+      12,
+      "jump"
+    );
+  }
+
+  if(key==="j"){
+    fireRasengan();
+  }
+
+  if(key==="f" && !event.repeat){
+    fireFireball();
+  }
+
+  if(
+    key==="k" &&
+    !event.repeat &&
+    state==="playing" &&
+    player.nineTailsTimer===0 &&
+    player.nineTailsCooldown===0
+  ){
+    player.nineTailsTimer=120;
+    shake=14;
+    fireNineTailsBlast();
+    burst(
+      player.x+player.width/2,
+      player.y+player.height/2,
+      45,
+      "nineTails"
+    );
+  }
+
+  if(key==="r" && state!=="playing"){
+    resetGame();
+  }
+});
+
+window.addEventListener("keyup",event=>{
+  keys[event.key.toLowerCase()]=false;
+});
+
+document.querySelectorAll(".touch-button").forEach(button=>{
+  const key=button.dataset.key;
+  const action=button.dataset.action;
+
+  button.addEventListener("pointerdown",event=>{
+    event.preventDefault();
+    startBackgroundMusic();
+    button.setPointerCapture(event.pointerId);
+
+    if(key){
+      keys[key]=true;
+      return;
+    }
+
+    if(action==="jump" && player.grounded && state==="playing"){
+      player.vy=player.jumpPower;
+      player.grounded=false;
+    }else if(action==="rasengan"){
+      fireRasengan();
+    }else if(action==="fire"){
+      fireFireball();
+    }else if(
+      action==="nine" &&
+      state==="playing" &&
+      player.nineTailsTimer===0 &&
+      player.nineTailsCooldown===0
+    ){
+      player.nineTailsTimer=120;
+      shake=14;
+      fireNineTailsBlast();
+      burst(player.x+player.width/2,player.y+player.height/2,45,"nineTails");
+    }
+  });
+
+  button.addEventListener("pointerup",event=>{
+    event.preventDefault();
+    if(key){
+      keys[key]=false;
+    }
+  });
+
+  button.addEventListener("pointercancel",()=>{
+    if(key){
+      keys[key]=false;
+    }
+  });
+});
+
+const joystick=document.getElementById("joystick");
+const joystickKnob=document.getElementById("joystick-knob");
+let joystickPointerId=null;
+
+function resetJoystick(){
+  keys.arrowleft=false;
+  keys.arrowright=false;
+  joystickKnob.style.transform="translate(0,0)";
+}
+
+function moveJoystick(event){
+  if(event.pointerId!==joystickPointerId){
+    return;
+  }
+
+  const rect=joystick.getBoundingClientRect();
+  const centerX=rect.left+rect.width/2;
+  const centerY=rect.top+rect.height/2;
+  const offsetX=event.clientX-centerX;
+  const offsetY=event.clientY-centerY;
+  const distance=Math.hypot(offsetX,offsetY) || 1;
+  const maxDistance=34;
+  const scale=Math.min(1,maxDistance/distance);
+  const knobX=offsetX*scale;
+  const knobY=offsetY*scale;
+
+  joystickKnob.style.transform=`translate(${knobX}px,${knobY}px)`;
+  keys.arrowleft=knobX<-10;
+  keys.arrowright=knobX>10;
+}
+
+joystick.addEventListener("pointerdown",event=>{
+  event.preventDefault();
+  startBackgroundMusic();
+  joystickPointerId=event.pointerId;
+  joystick.setPointerCapture(event.pointerId);
+  moveJoystick(event);
+});
+
+joystick.addEventListener("pointermove",moveJoystick);
+joystick.addEventListener("pointerup",event=>{
+  if(event.pointerId===joystickPointerId){
+    joystickPointerId=null;
+    resetJoystick();
+  }
+});
+joystick.addEventListener("pointercancel",()=>{
+  joystickPointerId=null;
+  resetJoystick();
+});
+
+/* -------------------------
+   Player
+------------------------- */
+
+function updatePlayer(){
+  player.previousY=player.y;
+
+  let moving=false;
+
+  if(keys.a || keys.arrowleft){
+    player.vx-=player.acceleration;
+    player.direction=-1;
+    moving=true;
+  }
+
+  if(keys.d || keys.arrowright){
+    player.vx+=player.acceleration;
+    player.direction=1;
+    moving=true;
+  }
+
+  player.vx=clamp(
+    player.vx,
+    -(player.nineTailsTimer>0 ? 9 : player.maxSpeed),
+    player.nineTailsTimer>0 ? 9 : player.maxSpeed
+  );
+
+  if(!moving){
+    player.vx*=player.friction;
+
+    if(Math.abs(player.vx)<.05){
+      player.vx=0;
+    }
+  }
+
+  player.x+=player.vx;
+
+  /* Vertical physics */
+  player.vy+=GAME.gravity;
+  player.vy=clamp(
+    player.vy,
+    -30,
+    GAME.maxFallSpeed
+  );
+
+  player.y+=player.vy;
+
+  player.grounded=false;
+
+  /*
+    Robust one-way platform collision.
+
+    previousBottom = where the feet were last frame.
+    currentBottom  = where the feet are now.
+
+    We only land if the player crossed the platform top
+    while moving downward.
+  */
+  const previousBottom=
+    player.previousY+player.height;
+
+  const currentBottom=
+    player.y+player.height;
+
+  if(player.vy>=0){
+    for(const platform of platforms){
+      const horizontalOverlap=
+        player.x+player.width>platform.x &&
+        player.x<platform.x+platform.width;
+
+      const crossedTop=
+        previousBottom<=platform.y &&
+        currentBottom>=platform.y;
+
+      if(horizontalOverlap && crossedTop){
+        player.y=platform.y-player.height;
+        player.vy=0;
+        player.grounded=true;
+        break;
+      }
+    }
+  }
+
+  /* Keep player inside the horizontal world. */
+  player.x=clamp(
+    player.x,
+    0,
+    GAME.width-player.width
+  );
+
+  /* Safety net: never let the character disappear below map. */
+  if(player.y>GAME.height+160){
+    damagePlayer();
+    if(state==="playing"){
+      respawnPlayer();
+    }
+  }
+
+  if(player.attackCooldown>0){
+    player.attackCooldown--;
+  }
+
+  if(player.fireCooldown>0){
+    player.fireCooldown--;
+  }
+
+  if(player.invulnerable>0){
+    player.invulnerable--;
+  }
+
+  if(player.nineTailsTimer>0){
+    player.nineTailsTimer--;
+
+    if(player.nineTailsTimer===0){
+      player.nineTailsCooldown=360;
+    }
+  }else if(player.nineTailsCooldown>0){
+    player.nineTailsCooldown--;
+  }
+
+  if(player.attackPose>0){
+    player.attackPose--;
+  }
+}
+
+function updateAbilityButtons(){
+  const fireButton=document.querySelector('[data-action="fire"]');
+  const nineButton=document.querySelector('[data-action="nine"]');
+
+  if(fireButton){
+    const fireReady=player.fireCooldown===0;
+    fireButton.textContent=fireReady
+      ? "FIRE"
+      : `FIRE ${Math.ceil(player.fireCooldown/60)}s`;
+    fireButton.classList.toggle("cooldown",!fireReady);
+  }
+
+  if(nineButton){
+    const nineActive=player.nineTailsTimer>0;
+    const nineReady=player.nineTailsCooldown===0;
+
+    nineButton.textContent=nineActive
+      ? `9T ${Math.ceil(player.nineTailsTimer/60)}s`
+      : nineReady
+        ? "9T"
+        : `9T ${Math.ceil(player.nineTailsCooldown/60)}s`;
+
+    nineButton.classList.toggle(
+      "cooldown",
+      !nineReady && !nineActive
+    );
+  }
+}
+
+function damagePlayer(amount=1){
+  if(player.invulnerable>0 || state!=="playing"){
+    return false;
+  }
+
+  player.hp-=amount;
+  player.invulnerable=75;
+
+  shake=12;
+
+  burst(
+    player.x+player.width/2,
+    player.y+player.height/2,
+    28,
+    "damage"
+  );
+
+  if(player.hp<=0){
+    state="gameover";
+  }
+
+  return true;
+}
+
+/* -------------------------
+   Attack
+------------------------- */
+
+function fireRasengan(){
+  if(
+    state!=="playing"
+  ){
+    return;
+  }
+
+  const nineTails=player.nineTailsTimer>0;
+  player.attackCooldown=0;
+  player.attackPose=8;
+
+  const startX=
+    player.x+
+    player.width/2+
+    player.direction*38;
+
+  const startY=
+    player.y+
+    player.height*.45;
+  const aim=getPlayerAimVector(startX,startY,nineTails ? 15 : 11);
+
+  projectiles.push({
+    x:startX,
+    y:startY,
+    vx:aim.vx,
+    vy:aim.vy,
+    radius:nineTails ? 17 : 13,
+    life:90,
+    rotation:0,
+    damage:5
+  });
+
+  burst(
+    startX,
+    startY,
+    12,
+    "chakra"
+  );
+}
+
+function getPlayerAimVector(startX,startY,speed){
+  if(boss.hp<=0){
+    return {vx:player.direction*speed,vy:0};
+  }
+
+  const targetX=boss.x+boss.width/2;
+  const targetY=boss.y+boss.height*.42;
+  const distance=Math.hypot(targetX-startX,targetY-startY) || 1;
+
+  return {
+    vx:(targetX-startX)/distance*speed,
+    vy:(targetY-startY)/distance*speed
+  };
+}
+
+function fireNineTailsBlast(){
+  const startX=player.x+player.width/2+player.direction*42;
+  const startY=player.y+player.height*.42;
+  player.attackPose=14;
+  const aim=getPlayerAimVector(startX,startY,13);
+
+  projectiles.push({
+    x:startX,
+    y:startY,
+    vx:aim.vx,
+    vy:aim.vy,
+    radius:26,
+    life:75,
+    rotation:0,
+    damage:10,
+    type:"nineTails"
+  });
+}
+
+function fireFireball(){
+  if(
+    player.fireCooldown>0 ||
+    state!=="playing"
+  ){
+    return;
+  }
+
+  player.fireCooldown=45;
+  player.attackPose=10;
+
+  const startX=player.x+player.width/2+player.direction*38;
+  const startY=player.y+player.height*.38;
+  const aim=getPlayerAimVector(startX,startY,10);
+
+  fireballs.push({
+    x:startX,
+    y:startY,
+    vx:aim.vx,
+    vy:aim.vy,
+    radius:16,
+    life:75,
+    rotation:0
+  });
+
+  burst(startX,startY,24,"fire");
+}
+
+function firePainProjectile(angleOffset=0){
+  const startX=boss.x+boss.width/2;
+  const startY=boss.y+boss.height*.42;
+  const targetX=player.x+player.width/2;
+  const targetY=player.y+player.height*.45;
+  const distance=Math.hypot(targetX-startX,targetY-startY) || 1;
+  const angle=Math.atan2(targetY-startY,targetX-startX)+angleOffset;
+  const speed=5.5;
+
+  enemyProjectiles.push({
+    x:startX,
+    y:startY,
+    vx:Math.cos(angle)*speed,
+    vy:Math.sin(angle)*speed,
+    radius:12,
+    life:150,
+    rotation:0,
+    type:"painAttack"
+  });
+
+  burst(startX,startY,14,"painAttack");
+}
+
+function launchPainToWood(){
+  if(!boss.grounded || Math.random()>.4){
+    return;
+  }
+
+  const targetPlatform=platforms[4];
+  const targetX=targetPlatform.x+targetPlatform.width/2;
+
+  boss.vy=-14;
+  boss.grounded=false;
+  boss.jumpCooldown=90;
+  boss.vx=clamp(
+    (targetX-boss.x)*.035,
+    -3.8,
+    3.8
+  );
+
+  burst(
+    boss.x+boss.width/2,
+    boss.y+boss.height/2,
+    24,
+    "hit"
+  );
+}
+
+/* -------------------------
+   Projectiles
+------------------------- */
+
+function updateProjectiles(){
+  for(let i=projectiles.length-1;i>=0;i--){
+    const shot=projectiles[i];
+
+    shot.x+=shot.vx;
+    shot.y+=shot.vy || 0;
+    shot.rotation+=.3;
+    shot.life--;
+
+    if(
+      shot.life<=0 ||
+      shot.x<-60 ||
+      shot.x>GAME.width+60
+    ){
+      projectiles.splice(i,1);
+      continue;
+    }
+
+    const hitbox={
+      x:shot.x-shot.radius,
+      y:shot.y-shot.radius,
+      width:shot.radius*2,
+      height:shot.radius*2
+    };
+
+    const bossBox={
+      x:boss.x,
+      y:boss.y,
+      width:boss.width,
+      height:boss.height
+    };
+
+    if(
+      boss.hp>0 &&
+      rectsOverlap(hitbox,bossBox)
+    ){
+      boss.hp-=shot.damage;
+      boss.hitFlash=10;
+      if(shot.type==="nineTails"){
+        playSound(sounds.nineTails);
+      }
+      launchPainToWood();
+
+      score+=25;
+      shake=7;
+
+      burst(
+        shot.x,
+        shot.y,
+        25,
+        "hit"
+      );
+
+      projectiles.splice(i,1);
+
+      if(boss.hp<=0){
+        score+=500;
+        state="won";
+
+        burst(
+          boss.x+boss.width/2,
+          boss.y+boss.height/2,
+          90,
+          "win"
+        );
+      }
+    }
+  }
+}
+
+function updateFireballs(){
+  for(let i=fireballs.length-1;i>=0;i--){
+    const shot=fireballs[i];
+
+    shot.x+=shot.vx;
+    shot.y+=shot.vy || 0;
+    shot.rotation+=.25;
+    shot.life--;
+
+    if(
+      shot.life<=0 ||
+      shot.x<-60 ||
+      shot.x>GAME.width+60
+    ){
+      fireballs.splice(i,1);
+      continue;
+    }
+
+    const hitbox={
+      x:shot.x-shot.radius,
+      y:shot.y-shot.radius,
+      width:shot.radius*2,
+      height:shot.radius*2
+    };
+
+    const bossBox={
+      x:boss.x,
+      y:boss.y,
+      width:boss.width,
+      height:boss.height
+    };
+
+    if(boss.hp>0 && rectsOverlap(hitbox,bossBox)){
+      boss.hp-=8;
+      boss.hitFlash=12;
+      launchPainToWood();
+      score+=40;
+      shake=9;
+      burst(shot.x,shot.y,35,"fire");
+      fireballs.splice(i,1);
+
+      if(boss.hp<=0){
+        score+=500;
+        state="won";
+        burst(
+          boss.x+boss.width/2,
+          boss.y+boss.height/2,
+          90,
+          "win"
+        );
+      }
+    }
+  }
+}
+
+function updateEnemyProjectiles(){
+  for(let i=enemyProjectiles.length-1;i>=0;i--){
+    const shot=enemyProjectiles[i];
+
+    shot.x+=shot.vx;
+    shot.y+=shot.vy;
+    shot.rotation+=.24;
+    shot.life--;
+
+    const hitbox={
+      x:shot.x-shot.radius,
+      y:shot.y-shot.radius,
+      width:shot.radius*2,
+      height:shot.radius*2
+    };
+
+    if(
+      shot.life<=0 ||
+      shot.x<-60 ||
+      shot.x>GAME.width+60 ||
+      shot.y<-60 ||
+      shot.y>GAME.height+60
+    ){
+      enemyProjectiles.splice(i,1);
+      continue;
+    }
+
+    if(rectsOverlap(hitbox,player)){
+      if(damagePlayer(5)){
+        playPainAttackSound();
+      }
+      burst(shot.x,shot.y,22,"damage");
+      enemyProjectiles.splice(i,1);
+    }
+  }
+}
+
+/* -------------------------
+   Boss
+------------------------- */
+
+function updateBoss(){
+  if(boss.hp<=0){
+    return;
+  }
+
+  const enraged=boss.hp<=boss.maxHp/2;
+  const targetDistance=player.x-boss.x;
+
+  if(Math.abs(targetDistance)>110){
+    boss.vx=Math.sign(targetDistance)*(enraged ? 3 : boss.speed);
+  }
+
+  boss.x+=boss.vx;
+  boss.previousY=boss.y;
+
+  boss.vy+=GAME.gravity;
+  boss.y+=boss.vy;
+  boss.grounded=false;
+
+  const previousBottom=boss.previousY+boss.height;
+  const currentBottom=boss.y+boss.height;
+
+  if(boss.vy>=0){
+    for(const platform of platforms){
+      const horizontalOverlap=
+        boss.x+boss.width>platform.x &&
+        boss.x<platform.x+platform.width;
+      const crossedTop=
+        previousBottom<=platform.y &&
+        currentBottom>=platform.y;
+
+      if(horizontalOverlap && crossedTop){
+        boss.y=platform.y-boss.height;
+        boss.vy=0;
+        boss.grounded=true;
+        break;
+      }
+    }
+  }
+
+  if(boss.jumpCooldown>0){
+    boss.jumpCooldown--;
+  }
+
+  if(
+    boss.x<boss.minX ||
+    boss.x+boss.width>boss.maxX
+  ){
+    boss.vx*=-1;
+  }
+
+  if(boss.hitFlash>0){
+    boss.hitFlash--;
+  }
+
+  if(boss.attackCooldown>0){
+    boss.attackCooldown--;
+  }
+
+  const bossBox={
+    x:boss.x,
+    y:boss.y,
+    width:boss.width,
+    height:boss.height
+  };
+
+  if(boss.attackCooldown===0){
+    if(rectsOverlap(player,bossBox)){
+      boss.attackCooldown=60;
+      if(damagePlayer(5)){
+        playPainAttackSound();
+      }
+    }else{
+      boss.attackCooldown=enraged ? 58 : 95;
+      firePainProjectile();
+
+      if(enraged){
+        firePainProjectile(-.22);
+        firePainProjectile(.22);
+        shake=10;
+      }
+    }
+  }
+}
+
+/* -------------------------
+   Chakra Orbs
+------------------------- */
+
+function updateOrbs(){
+  for(const orb of orbs){
+    orb.phase+=.05;
+
+    if(orb.collected){
+      continue;
+    }
+
+    const box={
+      x:orb.x-14,
+      y:orb.y-14,
+      width:28,
+      height:28
+    };
+
+    if(rectsOverlap(player,box)){
+      orb.collected=true;
+      score+=100;
+
+      burst(
+        orb.x,
+        orb.y,
+        25,
+        "orb"
+      );
+    }
+  }
+}
+
+/* -------------------------
+   Particles
+------------------------- */
+
+function updateParticles(){
+  for(let i=particles.length-1;i>=0;i--){
+    const particle=particles[i];
+
+    particle.x+=particle.vx;
+    particle.y+=particle.vy;
+
+    particle.vy+=.08;
+    particle.life-=.025;
+
+    if(particle.life<=0){
+      particles.splice(i,1);
+    }
+  }
+}
+
+/* -------------------------
+   Drawing: background
+------------------------- */
+
+function drawBackground(){
+  const sky=ctx.createLinearGradient(
+    0,0,0,GAME.height
+  );
+
+  sky.addColorStop(0,"#070b1d");
+  sky.addColorStop(.55,"#17294b");
+  sky.addColorStop(1,"#0d111b");
+
+  ctx.fillStyle=sky;
+  ctx.fillRect(
+    0,0,
+    GAME.width,
+    GAME.height
+  );
+
+  /* Stars */
+  for(const star of stars){
+    const alpha=
+      .35+
+      .5*Math.sin(
+        frame*star.speed+
+        star.phase
+      );
+
+    ctx.globalAlpha=alpha;
+    ctx.fillStyle="#fff";
+
+    ctx.beginPath();
+    ctx.arc(
+      star.x,
+      star.y,
+      star.r,
+      0,
+      Math.PI*2
+    );
+    ctx.fill();
+  }
+
+  ctx.globalAlpha=1;
+
+  /* Moon glow */
+  const glow=ctx.createRadialGradient(
+    930,100,5,
+    930,100,170
+  );
+
+  glow.addColorStop(
+    0,
+    "rgba(210,235,255,.30)"
+  );
+
+  glow.addColorStop(
+    1,
+    "rgba(210,235,255,0)"
+  );
+
+  ctx.fillStyle=glow;
+  ctx.fillRect(
+    760,-70,
+    350,350
+  );
+
+  ctx.fillStyle="#eaf2ff";
+  ctx.beginPath();
+  ctx.arc(
+    930,100,40,
+    0,Math.PI*2
+  );
+  ctx.fill();
+
+  /* Distant village */
+  ctx.fillStyle="rgba(100,125,165,.14)";
+
+  for(let x=0;x<GAME.width;x+=65){
+    const h=50+((x*19)%100);
+
+    ctx.fillRect(
+      x,
+      540-h,
+      50,
+      h
+    );
+  }
+
+  /* Distant mountains */
+  ctx.fillStyle="rgba(60,82,120,.20)";
+  ctx.beginPath();
+  ctx.moveTo(0,510);
+  ctx.lineTo(190,350);
+  ctx.lineTo(350,510);
+  ctx.lineTo(530,330);
+  ctx.lineTo(760,510);
+  ctx.lineTo(950,360);
+  ctx.lineTo(1200,520);
+  ctx.lineTo(1200,675);
+  ctx.lineTo(0,675);
+  ctx.closePath();
+  ctx.fill();
+
+  /* Moving chakra streaks */
+  ctx.save();
+  ctx.globalAlpha=.18;
+  ctx.lineWidth=2;
+
+  for(let streak=0;streak<9;streak++){
+    const streakX=
+      ((frame*(1.2+streak*.08)+streak*170)%1400)-100;
+    const streakY=170+streak*42;
+
+    ctx.strokeStyle=streak%2===0
+      ? "#5bdcff"
+      : "#d45bff";
+    ctx.beginPath();
+    ctx.moveTo(streakX,streakY);
+    ctx.lineTo(streakX+85,streakY-18);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+
+  /* Rare distant lightning flash */
+  const lightningPhase=frame%420;
+  if(lightningPhase>398 && lightningPhase<405){
+    ctx.save();
+    ctx.globalAlpha=(405-lightningPhase)*.035;
+    ctx.fillStyle="#d8f4ff";
+    ctx.fillRect(0,0,GAME.width,GAME.height);
+    ctx.restore();
+  }
+}
+
+/* -------------------------
+   Drawing: platforms
+------------------------- */
+
+function drawPlatforms(){
+  for(const platform of platforms){
+    /* shadow */
+    ctx.fillStyle="rgba(0,0,0,.40)";
+    ctx.fillRect(
+      platform.x,
+      platform.y+8,
+      platform.width,
+      platform.height
+    );
+
+    if(platform.type==="ground"){
+      const ground=ctx.createLinearGradient(
+        0,platform.y,
+        0,GAME.height
+      );
+
+      ground.addColorStop(0,"#503021");
+      ground.addColorStop(1,"#171016");
+
+      ctx.fillStyle=ground;
+      ctx.fillRect(
+        platform.x,
+        platform.y,
+        platform.width,
+        platform.height
+      );
+
+      ctx.fillStyle="#d89a4d";
+      ctx.fillRect(
+        platform.x,
+        platform.y,
+        platform.width,
+        6
+      );
+
+      ctx.fillStyle="#6c3f2b";
+
+      for(
+        let x=platform.x+12;
+        x<platform.x+platform.width;
+        x+=25
+      ){
+        ctx.fillRect(
+          x,
+          platform.y+14,
+          4,
+          28
+        );
+      }
+    }else{
+      const wood=ctx.createLinearGradient(
+        0,platform.y,
+        0,platform.y+platform.height
+      );
+
+      wood.addColorStop(0,"#553127");
+      wood.addColorStop(1,"#1c1418");
+
+      ctx.fillStyle=wood;
+      ctx.fillRect(
+        platform.x,
+        platform.y,
+        platform.width,
+        platform.height
+      );
+
+      ctx.fillStyle="#db9b4c";
+      ctx.fillRect(
+        platform.x,
+        platform.y,
+        platform.width,
+        5
+      );
+
+      ctx.fillStyle="#9b5b35";
+
+      for(
+        let x=platform.x+10;
+        x<platform.x+platform.width;
+        x+=22
+      ){
+        ctx.fillRect(
+          x,
+          platform.y+9,
+          3,
+          7
+        );
+      }
+    }
+  }
+}
+
+/* -------------------------
+   Drawing helpers
+------------------------- */
+
+function drawGlow(x,y,r,color){
+  const gradient=ctx.createRadialGradient(
+    x,y,0,
+    x,y,r
+  );
+
+  gradient.addColorStop(0,color);
+  gradient.addColorStop(
+    1,
+    "rgba(0,0,0,0)"
+  );
+
+  ctx.fillStyle=gradient;
+
+  ctx.beginPath();
+  ctx.arc(
+    x,y,r,
+    0,Math.PI*2
+  );
+  ctx.fill();
+}
+
+function drawCharacterImage(
+  image,
+  x,y,
+  width,height,
+  flip=false,
+  rotation=0,
+  scaleX=1
+){
+  ctx.save();
+
+  ctx.translate(
+    x+width/2,
+    y+height/2
+  );
+
+  if(flip){
+    ctx.scale(-1,1);
+  }
+
+  ctx.rotate(rotation);
+  ctx.scale(scaleX,1);
+
+  ctx.beginPath();
+  ctx.roundRect(
+    -width/2,
+    -height/2,
+    width,
+    height,
+    13
+  );
+  ctx.clip();
+
+  if(
+    image.complete &&
+    image.naturalWidth>0
+  ){
+    ctx.drawImage(
+      image,
+      -width/2,
+      -height/2,
+      width,
+      height
+    );
+  }else{
+    ctx.fillStyle="#222";
+    ctx.fillRect(
+      -width/2,
+      -height/2,
+      width,
+      height
+    );
+  }
+
+  ctx.restore();
+}
+
+function drawShadowFighter(
+  x,y,width,height,kind,direction,phase,attack,airborne,hitFlash
+){
+  const isNaruto=kind==="naruto";
+  const run=Math.sin(phase)*.28;
+  const attackAmount=attack>0
+    ? Math.min(1,attack/8)
+    : 0;
+  const lean=airborne ? -direction*.08 : direction*.035;
+  const accent=isNaruto ? "#ff8b2d" : "#ff3fc8";
+  const glow=isNaruto
+    ? "rgba(255,95,25,.35)"
+    : "rgba(205,35,255,.48)";
+
+  drawGlow(
+    x+width/2,
+    y+height/2,
+    isNaruto ? 76 : 82,
+    glow
+  );
+
+  ctx.save();
+  ctx.translate(x+width/2,y+height/2);
+  ctx.scale(direction,1);
+  ctx.rotate(lean);
+  ctx.lineCap="round";
+  ctx.lineJoin="round";
+
+  const headY=-height*.34;
+  const shoulderY=-height*.12;
+  const hipY=height*.22;
+  const footY=height*.5;
+
+  /* Premium colored Shadow-Fight body silhouette */
+  ctx.fillStyle=isNaruto ? "#d85b1d" : "#10051c";
+  ctx.strokeStyle=isNaruto ? "#8d2d18" : "#05020a";
+  ctx.lineWidth=10;
+
+  ctx.beginPath();
+  ctx.arc(0,headY,height*.14,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(0,shoulderY);
+  ctx.lineTo(0,hipY);
+  ctx.stroke();
+
+  if(isNaruto){
+    ctx.fillStyle="#f47b24";
+    ctx.beginPath();
+    ctx.ellipse(0,shoulderY+height*.18,width*.2,height*.3,0,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  const stride=airborne ? -.15 : run;
+  ctx.lineWidth=8;
+  ctx.beginPath();
+  ctx.moveTo(0,hipY);
+  ctx.lineTo(-width*.22+stride*width,footY);
+  ctx.moveTo(0,hipY);
+  ctx.lineTo(width*.22-stride*width,footY);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(0,shoulderY);
+  ctx.lineTo(-width*.28,shoulderY+height*.18);
+  ctx.moveTo(0,shoulderY);
+  ctx.lineTo(
+    attackAmount ? width*.72 : width*.28,
+    attackAmount ? shoulderY-height*.02 : shoulderY+height*.18
+  );
+  ctx.stroke();
+
+  /* Colored fighter edge and headband */
+  ctx.strokeStyle=accent;
+  ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.moveTo(-width*.14,headY-height*.12);
+  ctx.lineTo(width*.14,headY-height*.12);
+  ctx.stroke();
+
+  ctx.fillStyle=accent;
+  ctx.fillRect(
+    -width*.16,
+    headY-height*.08,
+    width*.32,
+    4
+  );
+
+  if(isNaruto){
+    ctx.globalAlpha=.8;
+    ctx.strokeStyle="#ffd06a";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(-width*.18,shoulderY+height*.08);
+    ctx.lineTo(-width*.06,hipY-height*.02);
+    ctx.moveTo(width*.18,shoulderY+height*.08);
+    ctx.lineTo(width*.06,hipY-height*.02);
+    ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+
+  if(isNaruto){
+    ctx.strokeStyle="#ffb13b";
+    ctx.lineWidth=3;
+    for(let spike=0;spike<5;spike++){
+      ctx.beginPath();
+      ctx.moveTo(-width*.12+spike*width*.06,headY-height*.42);
+      ctx.lineTo(-width*.2+spike*width*.1,headY-height*.6);
+      ctx.stroke();
+    }
+  }else{
+    ctx.strokeStyle="#ff3c6e";
+    ctx.lineWidth=3;
+    ctx.beginPath();
+    ctx.moveTo(-width*.11,headY);
+    ctx.lineTo(width*.11,headY);
+    ctx.stroke();
+
+    ctx.strokeStyle="#55f5ff";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.arc(0,shoulderY+height*.1,width*.34,0,Math.PI*2);
+    ctx.stroke();
+
+    ctx.strokeStyle="#ff3fc8";
+    ctx.beginPath();
+    ctx.arc(0,shoulderY+height*.1,width*.25,0,Math.PI*2);
+    ctx.stroke();
+  }
+
+  if(hitFlash>0){
+    ctx.globalAlpha=.7;
+    ctx.strokeStyle="#fff";
+    ctx.lineWidth=4;
+    ctx.strokeRect(-width*.45,-height*.5,width*.9,height);
+  }
+
+  ctx.restore();
+}
+
+/* -------------------------
+   Drawing: orbs
+------------------------- */
+
+function drawOrbs(){
+  for(const orb of orbs){
+    if(orb.collected){
+      continue;
+    }
+
+    const y=
+      orb.y+
+      Math.sin(orb.phase)*7;
+
+    drawGlow(
+      orb.x,
+      y,
+      38,
+      "rgba(70,205,255,.34)"
+    );
+
+    ctx.save();
+
+    ctx.translate(
+      orb.x,
+      y
+    );
+
+    ctx.rotate(orb.phase);
+
+    ctx.fillStyle="#91ecff";
+
+    ctx.beginPath();
+    ctx.arc(
+      0,0,12,
+      0,Math.PI*2
+    );
+    ctx.fill();
+
+    ctx.strokeStyle="#fff";
+    ctx.lineWidth=2;
+    ctx.stroke();
+
+    ctx.fillStyle="#fff";
+    ctx.globalAlpha=.85;
+    ctx.fillRect(-4,-7,3,6);
+
+    ctx.restore();
+    ctx.globalAlpha=1;
+  }
+}
+
+/* -------------------------
+   Drawing: Naruto
+------------------------- */
+
+function drawPlayer(){
+  const x=player.x;
+  const y=player.y;
+  const running=Math.abs(player.vx)>.15;
+  const runBob=running
+    ? Math.abs(Math.sin(frame*.32))*4
+    : Math.sin(frame*.08)*1.5;
+
+  const cx=
+    x+
+    player.width/2;
+
+  const cy=
+    y+
+    player.height/2;
+
+  if(
+    player.invulnerable>0 &&
+    Math.floor(
+      player.invulnerable/5
+    )%2===0
+  ){
+    ctx.globalAlpha=.35;
+  }
+
+  if(player.nineTailsTimer>0){
+    drawGlow(
+      cx,
+      cy,
+      98,
+      "rgba(255,45,35,.48)"
+    );
+
+    ctx.save();
+    ctx.strokeStyle="rgba(255,105,35,.8)";
+    ctx.lineWidth=8;
+    ctx.lineCap="round";
+
+    for(let tail=0;tail<3;tail++){
+      ctx.beginPath();
+      ctx.moveTo(cx-18+tail*18,y+player.height-18);
+      ctx.quadraticCurveTo(
+        cx-52+tail*52,
+        y-35-Math.sin(frame*.12+tail)*12,
+        cx-12+tail*28,
+        y-58
+      );
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  /* Chakra aura */
+  drawGlow(
+    cx,
+    cy,
+    68,
+    player.nineTailsTimer>0
+      ? "rgba(255,35,35,.45)"
+      : "rgba(255,145,40,.22)"
+  );
+
+  /* Shadow */
+  ctx.fillStyle="rgba(0,0,0,.48)";
+  ctx.beginPath();
+  ctx.ellipse(
+    cx,
+    y+player.height+6,
+    34,8,
+    0,0,Math.PI*2
+  );
+  ctx.fill();
+
+  drawShadowFighter(
+    x,
+    y-runBob,
+    player.width,
+    player.height,
+    "naruto",
+    player.direction,
+    frame*.32,
+    player.attackPose,
+    !player.grounded,
+    0
+  );
+
+  ctx.strokeStyle="#ff9d38";
+  ctx.lineWidth=3;
+  ctx.shadowBlur=17;
+  ctx.shadowColor="#ff7518";
+
+  ctx.strokeRect(
+    x+2,
+    y+2,
+    player.width-4,
+    player.height-4
+  );
+
+  ctx.shadowBlur=0;
+  ctx.globalAlpha=1;
+}
+
+/* -------------------------
+   Drawing: Pain
+------------------------- */
+
+function drawBoss(){
+  if(boss.hp<=0){
+    return;
+  }
+
+  const cx=
+    boss.x+
+    boss.width/2;
+
+  const cy=
+    boss.y+
+    boss.height/2;
+  const bossMotion=Math.abs(boss.vy)>.5
+    ? Math.sin(frame*.25)*3
+    : Math.sin(frame*.1)*1.5;
+
+  drawGlow(
+    cx,
+    cy,
+    boss.hp<=boss.maxHp/2 ? 105 : 78,
+    boss.hp<=boss.maxHp/2
+      ? "rgba(255,20,155,.62)"
+      : "rgba(205,35,255,.42)"
+  );
+
+  ctx.save();
+  ctx.globalAlpha=.28+.12*Math.sin(frame*.14);
+  ctx.strokeStyle=boss.hp<=boss.maxHp/2
+    ? "#ff247d"
+    : "#55f5ff";
+  ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.arc(cx,cy,50+Math.sin(frame*.1)*5,0,Math.PI*2);
+  ctx.stroke();
+  ctx.restore();
+
+  if(boss.hp<=boss.maxHp/2){
+    ctx.save();
+    ctx.fillStyle="#ff6bb5";
+    ctx.font="bold 16px Arial";
+    ctx.textAlign="center";
+    ctx.fillText("PAIN RAGE",cx,boss.y-34);
+    ctx.restore();
+  }
+
+  drawShadowFighter(
+    boss.x,
+    boss.y-bossMotion,
+    boss.width,
+    boss.height,
+    "pain",
+    -1,
+    frame*.22,
+    0,
+    Math.abs(boss.vy)>.5,
+    boss.hitFlash
+  );
+
+  /* Boss health bar */
+  const barWidth=185;
+  const barHeight=13;
+
+  const barX=
+    cx-
+    barWidth/2;
+
+  const barY=
+    boss.y-
+    25;
+
+  ctx.fillStyle="rgba(20,5,25,.9)";
+  ctx.beginPath();
+  ctx.roundRect(
+    barX,
+    barY,
+    barWidth,
+    barHeight,
+    7
+  );
+  ctx.fill();
+
+  ctx.fillStyle="#ff304f";
+  ctx.beginPath();
+  ctx.roundRect(
+    barX,
+    barY,
+    barWidth*(boss.hp/boss.maxHp),
+    barHeight,
+    7
+  );
+  ctx.fill();
+
+  ctx.strokeStyle=
+    "rgba(255,255,255,.45)";
+  ctx.stroke();
+
+  ctx.fillStyle="#fff";
+  ctx.font="bold 12px Arial";
+  ctx.textAlign="center";
+  ctx.fillText(
+    `PAIN HP ${boss.hp}/${boss.maxHp}`,
+    cx,
+    barY-7
+  );
+  ctx.textAlign="left";
+}
+
+/* -------------------------
+   Drawing: Rasengan
+------------------------- */
+
+function drawProjectiles(){
+  for(const shot of projectiles){
+    drawGlow(
+      shot.x,
+      shot.y,
+      36,
+      "rgba(70,210,255,.52)"
+    );
+
+    ctx.save();
+
+    ctx.translate(
+      shot.x,
+      shot.y
+    );
+
+    ctx.rotate(
+      shot.rotation
+    );
+
+    const nineTailsShot=shot.type==="nineTails";
+
+    ctx.fillStyle=nineTailsShot ? "#ffad38" : "#e4fcff";
+
+    ctx.beginPath();
+    ctx.arc(
+      0,0,
+      shot.radius,
+      0,Math.PI*2
+    );
+    ctx.fill();
+
+    ctx.strokeStyle=nineTailsShot ? "#ff302e" : "#45cfff";
+    ctx.lineWidth=nineTailsShot ? 5 : 3;
+    ctx.stroke();
+
+    ctx.strokeStyle=nineTailsShot
+      ? "rgba(255,55,35,.95)"
+      : "rgba(35,165,255,.95)";
+    ctx.lineWidth=2;
+
+    ctx.beginPath();
+    ctx.arc(
+      0,0,
+      9,
+      0,Math.PI*1.6
+    );
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+function drawFireballs(){
+  for(const shot of fireballs){
+    drawGlow(
+      shot.x,
+      shot.y,
+      45,
+      "rgba(255,75,15,.52)"
+    );
+
+    ctx.save();
+    ctx.translate(shot.x,shot.y);
+    ctx.rotate(shot.rotation);
+
+    ctx.fillStyle="#ffcf45";
+    ctx.beginPath();
+    ctx.arc(0,0,shot.radius,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle="#ff651f";
+    ctx.beginPath();
+    ctx.moveTo(-5,10);
+    ctx.lineTo(-12,23);
+    ctx.lineTo(1,14);
+    ctx.lineTo(8,24);
+    ctx.lineTo(9,8);
+    ctx.fill();
+
+    ctx.strokeStyle="#ff3918";
+    ctx.lineWidth=3;
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawEnemyProjectiles(){
+  for(const shot of enemyProjectiles){
+    drawGlow(
+      shot.x,
+      shot.y,
+      34,
+      "rgba(210,70,255,.55)"
+    );
+
+    ctx.save();
+    ctx.translate(shot.x,shot.y);
+    ctx.rotate(shot.rotation);
+
+    ctx.fillStyle="#f1c5ff";
+    ctx.beginPath();
+    ctx.arc(0,0,shot.radius,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.strokeStyle="#b84cff";
+    ctx.lineWidth=3;
+    ctx.stroke();
+
+    ctx.strokeStyle="#7c20c9";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.arc(0,0,8,0,Math.PI*1.6);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+/* -------------------------
+   Drawing: particles
+------------------------- */
+
+function drawParticles(){
+  for(const particle of particles){
+    ctx.globalAlpha=
+      Math.max(0,particle.life);
+
+    if(particle.type==="damage"){
+      ctx.fillStyle="#ff5864";
+    }else if(particle.type==="hit"){
+      ctx.fillStyle="#c86cff";
+    }else if(particle.type==="jump"){
+      ctx.fillStyle="#ffb33d";
+    }else if(particle.type==="fire"){
+      ctx.fillStyle="#ff6a1f";
+    }else if(particle.type==="nineTails"){
+      ctx.fillStyle="#ff392b";
+    }else if(particle.type==="orb"){
+      ctx.fillStyle="#6edcff";
+    }else{
+      ctx.fillStyle="#9deaff";
+    }
+
+    ctx.beginPath();
+    ctx.arc(
+      particle.x,
+      particle.y,
+      particle.size*
+        Math.max(
+          particle.life,
+          .2
+        ),
+      0,Math.PI*2
+    );
+    ctx.fill();
+  }
+
+  ctx.globalAlpha=1;
+}
+
+/* -------------------------
+   Drawing: UI
+------------------------- */
+
+function drawUI(){
+  updateAbilityButtons();
+
+  /* Left panel */
+  ctx.fillStyle=
+    "rgba(5,10,22,.80)";
+
+  ctx.beginPath();
+  ctx.roundRect(
+    18,18,
+    365,88,
+    15
+  );
+  ctx.fill();
+
+  ctx.strokeStyle=
+    "rgba(255,255,255,.16)";
+  ctx.stroke();
+
+  ctx.fillStyle="#fff";
+  ctx.font="bold 21px Arial";
+  ctx.fillText(
+    "🍥 NARUTO: SHADOW RUN",
+    34,44
+  );
+
+  ctx.fillStyle="#8fe8ff";
+  ctx.font="bold 17px Arial";
+  ctx.fillText(
+    "Score: "+score,
+    34,70
+  );
+
+  const creatorPulse=
+    .72+
+    Math.sin(frame*.08)*.22;
+  const creatorShimmer=
+    34+
+    ((frame*1.8)%300);
+
+  ctx.save();
+  ctx.globalAlpha=creatorPulse;
+  ctx.font="bold 11px Arial";
+  ctx.fillStyle="#ffb454";
+  ctx.shadowBlur=12;
+  ctx.shadowColor="#ff6a2a";
+  ctx.fillText("MADE BY RITAM",34,88);
+
+  ctx.globalAlpha=.65;
+  ctx.strokeStyle="#ffcf72";
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(34,92);
+  ctx.lineTo(creatorShimmer,92);
+  ctx.stroke();
+  ctx.restore();
+
+  /* HP panel */
+  ctx.fillStyle=
+    "rgba(5,10,22,.80)";
+
+  ctx.beginPath();
+  ctx.roundRect(
+    GAME.width-220,
+    18,
+    202,
+    62,
+    15
+  );
+  ctx.fill();
+
+  /* Ability status */
+  ctx.fillStyle="rgba(5,10,22,.78)";
+  ctx.beginPath();
+  ctx.roundRect(405,18,390,42,13);
+  ctx.fill();
+
+  ctx.font="bold 13px Arial";
+  ctx.fillStyle="#8fe8ff";
+  ctx.fillText(
+    player.fireCooldown>0
+      ? `FIRE ${Math.ceil(player.fireCooldown/60)}s`
+      : "FIRE READY",
+    430,
+    44
+  );
+
+  ctx.fillStyle=player.nineTailsTimer>0
+    ? "#ff8a54"
+    : player.nineTailsCooldown>0
+      ? "#9a7080"
+      : "#ffb454";
+  ctx.fillText(
+    player.nineTailsTimer>0
+      ? `9T ACTIVE ${Math.ceil(player.nineTailsTimer/60)}s`
+      : player.nineTailsCooldown>0
+        ? `9T COOLDOWN ${Math.ceil(player.nineTailsCooldown/60)}s`
+        : "9T READY",
+    610,
+    44
+  );
+
+  ctx.fillStyle="#fff";
+  ctx.font="bold 14px Arial";
+  ctx.fillText(
+    `NARUTO HP ${player.hp}/${player.maxHp}`,
+    GAME.width-198,
+    41
+  );
+
+  ctx.fillStyle="#3d4250";
+  ctx.beginPath();
+  ctx.roundRect(GAME.width-198,52,165,12,6);
+  ctx.fill();
+
+  ctx.fillStyle="#ff5864";
+  ctx.beginPath();
+  ctx.roundRect(
+    GAME.width-198,
+    52,
+    165*(player.hp/player.maxHp),
+    12,
+    6
+  );
+  ctx.fill();
+
+  /* Attack cooldown */
+  if(player.attackCooldown>0){
+    ctx.fillStyle=
+      "rgba(0,0,0,.48)";
+
+    ctx.beginPath();
+    ctx.roundRect(
+      GAME.width/2-80,
+      20,
+      160,
+      27,
+      13
+    );
+    ctx.fill();
+
+    ctx.fillStyle="#8feaff";
+    ctx.font="bold 12px Arial";
+    ctx.textAlign="center";
+
+    ctx.fillText(
+      "RASENGAN CHARGING",
+      GAME.width/2,
+      39
+    );
+
+    ctx.textAlign="left";
+  }
+}
+
+/* -------------------------
+   Overlay
+------------------------- */
+
+function drawOverlay(){
+  if(state==="playing" || state==="countdown"){
+    return;
+  }
+
+  ctx.fillStyle=
+    "rgba(3,5,12,.80)";
+  ctx.fillRect(
+    0,0,
+    GAME.width,
+    GAME.height
+  );
+
+  const won=
+    state==="won";
+
+  ctx.textAlign="center";
+
+  ctx.shadowBlur=26;
+  ctx.shadowColor=
+    won
+    ? "#61ddff"
+    : "#ff3d61";
+
+  ctx.fillStyle=
+    won
+    ? "#8eeaff"
+    : "#ff6375";
+
+  ctx.font="900 64px Arial";
+
+  ctx.fillText(
+    won
+    ? "YOU WIN!"
+    : "GAME OVER",
+    GAME.width/2,
+    265
+  );
+
+  ctx.shadowBlur=0;
+
+  ctx.fillStyle="#fff";
+  ctx.font="22px Arial";
+
+  ctx.fillText(
+    won
+    ? "Pain has been defeated!"
+    : "Naruto was defeated.",
+    GAME.width/2,
+    310
+  );
+
+  ctx.fillStyle="#cbd7e9";
+  ctx.font="bold 18px Arial";
+
+  ctx.fillText(
+    "Press R to restart",
+    GAME.width/2,
+    355
+  );
+
+  ctx.textAlign="left";
+}
+
+function drawCountdown(){
+  const seconds=Math.ceil((countdownFrames-30)/60);
+  const label=countdownFrames>30 ? seconds : "FIGHT!";
+
+  ctx.save();
+  ctx.fillStyle="rgba(3,5,12,.28)";
+  ctx.fillRect(0,0,GAME.width,GAME.height);
+  ctx.textAlign="center";
+  ctx.font="900 86px Arial";
+  ctx.fillStyle=label==="FIGHT!" ? "#ffb454" : "#fff";
+  ctx.shadowBlur=28;
+  ctx.shadowColor=label==="FIGHT!" ? "#ff542e" : "#61ddff";
+  ctx.fillText(label,GAME.width/2,350);
+  ctx.restore();
+}
+
+/* -------------------------
+   Reset
+------------------------- */
+
+function resetGame(){
+  score=0;
+  state="countdown";
+  frame=0;
+  shake=0;
+  countdownFrames=210;
+
+  player.hp=player.maxHp;
+  player.vx=0;
+  player.vy=0;
+  player.direction=1;
+  player.attackCooldown=0;
+  player.fireCooldown=0;
+  player.invulnerable=0;
+  player.nineTailsTimer=0;
+  player.nineTailsCooldown=0;
+  player.attackPose=0;
+
+  boss.x=900;
+  boss.vx=1.45;
+  boss.hp=boss.maxHp;
+  boss.hitFlash=0;
+  boss.attackCooldown=0;
+  boss.vy=0;
+  boss.previousY=0;
+  boss.grounded=true;
+  boss.jumpCooldown=90;
+
+  projectiles.length=0;
+  fireballs.length=0;
+  enemyProjectiles.length=0;
+  particles.length=0;
+
+  for(const orb of orbs){
+    orb.collected=false;
+  }
+
+  /*
+    THIS is the important spawn fix.
+    Ground top = 590
+    Naruto height = 92
+    Therefore:
+      y = 590 - 92 = 498
+
+    So Naruto starts exactly ON the floor,
+    not inside it and not below it.
+  */
+  respawnPlayer();
+
+  /*
+    Pain also starts exactly on the floor.
+    590 - 96 = 494
+  */
+  boss.y=
+    platforms[0].y-
+    boss.height;
+}
+
+/* -------------------------
+   Main loop
+------------------------- */
+
+function update(){
+  frame++;
+
+  if(painSoundCooldown>0){
+    painSoundCooldown--;
+  }
+
+  if(state==="countdown"){
+    countdownFrames--;
+
+    if(countdownFrames<=0){
+      state="playing";
+    }
+
+    updateParticles();
+    return;
+  }
+
+  if(state==="playing"){
+    updatePlayer();
+    updateBoss();
+    updateProjectiles();
+    updateFireballs();
+    updateEnemyProjectiles();
+    updateOrbs();
+  }
+
+  updateParticles();
+
+  if(shake>0){
+    shake*=.82;
+  }
+}
+
+function draw(){
+  ctx.save();
+
+  if(shake>0){
+    ctx.translate(
+      (Math.random()-.5)*shake,
+      (Math.random()-.5)*shake
+    );
+  }
+
+  drawBackground();
+  drawPlatforms();
+  drawOrbs();
+  drawProjectiles();
+  drawFireballs();
+  drawEnemyProjectiles();
+  drawBoss();
+  drawPlayer();
+  drawParticles();
+  drawUI();
+  drawOverlay();
+
+  if(state==="countdown"){
+    drawCountdown();
+  }
+
+  ctx.restore();
+}
+
+function gameLoop(){
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+resetGame();
+gameLoop();
+</script>
+</body>
+</html>
