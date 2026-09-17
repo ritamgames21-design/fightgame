@@ -44,23 +44,55 @@ canvas{
 .touch-controls{
   display:none;
 }
+.play-again{
+  display:none;
+  position:fixed;
+  left:50%;
+  top:58%;
+  z-index:10;
+  transform:translate(-50%,-50%);
+  padding:13px 28px;
+  border:1px solid rgba(255,190,90,.8);
+  border-radius:999px;
+  color:#fff;
+  background:linear-gradient(135deg,#d7474d,#9e245e);
+  box-shadow:0 0 28px rgba(255,70,80,.45);
+  font:bold 15px Arial,sans-serif;
+  letter-spacing:1px;
+  cursor:pointer;
+}
+.play-again.visible{
+  display:block;
+  animation:playAgainIn .35s ease-out both;
+}
+@keyframes playAgainIn{
+  from{opacity:0;transform:translate(-50%,-35%) scale(.8)}
+  to{opacity:1;transform:translate(-50%,-50%) scale(1)}
+}
 @media (pointer:coarse), (max-width:700px){
   body{
     align-items:flex-start;
-    padding-top:10px;
+    justify-content:flex-start;
+    padding:0;
+    background:#05070d;
   }
   .shell{
     width:100vw;
+    max-width:none;
   }
   canvas{
-    border-radius:10px;
+    width:100vw;
+    height:56.25vw;
+    max-height:100vh;
+    border:0;
+    border-radius:0;
   }
   .controls{
     display:none;
   }
   .touch-controls{
     position:fixed;
-    inset:auto 0 12px;
+    inset:auto 0 env(safe-area-inset-bottom,12px);
     display:flex;
     align-items:flex-end;
     justify-content:space-between;
@@ -159,6 +191,26 @@ canvas{
     }
   }
 }
+@media (pointer:coarse) and (orientation:portrait){
+  body::before{
+    content:"ROTATE PHONE FOR LANDSCAPE PLAY";
+    position:fixed;
+    left:50%;
+    top:50%;
+    z-index:20;
+    transform:translate(-50%,-50%);
+    padding:14px 18px;
+    border:1px solid rgba(255,180,84,.65);
+    border-radius:14px;
+    color:#ffd27a;
+    background:rgba(5,10,22,.92);
+    box-shadow:0 0 30px rgba(255,84,46,.28);
+    font:bold 13px Arial,sans-serif;
+    letter-spacing:1px;
+    text-align:center;
+    pointer-events:none;
+  }
+}
 </style>
 </head>
 <body>
@@ -177,6 +229,7 @@ canvas{
     <button class="touch-button power-button" data-action="nine" aria-label="Nine-Tails">9T</button>
   </div>
 </div>
+<button class="play-again" id="play-again" type="button">PLAY AGAIN</button>
 
 <script>
 "use strict";
@@ -192,6 +245,7 @@ canvas{
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+const playAgainButton = document.getElementById("play-again");
 
 const GAME = {
   width: canvas.width,
@@ -496,6 +550,11 @@ window.addEventListener("keydown",event=>{
 
 window.addEventListener("keyup",event=>{
   keys[event.key.toLowerCase()]=false;
+});
+
+playAgainButton.addEventListener("click",()=>{
+  startBackgroundMusic();
+  resetGame();
 });
 
 document.querySelectorAll(".touch-button").forEach(button=>{
@@ -2381,6 +2440,7 @@ function resetGame(){
   frame=0;
   shake=0;
   countdownFrames=210;
+  playAgainButton.classList.remove("visible");
 
   player.hp=player.maxHp;
   player.vx=0;
@@ -2439,6 +2499,11 @@ function resetGame(){
 
 function update(){
   frame++;
+
+  playAgainButton.classList.toggle(
+    "visible",
+    state==="gameover" || state==="won"
+  );
 
   if(painSoundCooldown>0){
     painSoundCooldown--;
@@ -2511,3 +2576,4 @@ gameLoop();
 </script>
 </body>
 </html>
+
