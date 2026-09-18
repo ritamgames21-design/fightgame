@@ -65,6 +65,43 @@ canvas{
   display:block;
   animation:playAgainIn .35s ease-out both;
 }
+.start-menu{
+  position:absolute;
+  inset:0;
+  z-index:8;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:16px;
+  background:rgba(4,8,18,.72);
+}
+.start-menu.hidden{display:none}
+.start-card{
+  width:min(88%,520px);
+  padding:30px 34px;
+  border:1px solid rgba(143,232,255,.35);
+  border-radius:20px;
+  text-align:center;
+  color:#fff;
+  background:linear-gradient(145deg,rgba(13,29,58,.96),rgba(28,9,35,.94));
+  box-shadow:0 18px 55px rgba(0,0,0,.52),0 0 35px rgba(74,181,255,.16);
+}
+.start-card h1{margin:0 0 8px;font:900 31px Arial,sans-serif;letter-spacing:1px}
+.start-card h1{color:#e8fbff;text-shadow:0 0 10px #45cfff,0 0 28px rgba(255,91,180,.8)}
+.start-card p{margin:0 0 22px;color:#b9cce5;font:14px Arial,sans-serif}
+.difficulty-list{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.difficulty-button{
+  min-height:68px;
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:12px;
+  color:#fff;
+  background:rgba(7,15,33,.82);
+  cursor:pointer;
+  font:bold 15px Arial,sans-serif;
+  transition:transform .18s ease,background .18s ease,border-color .18s ease;
+}
+.difficulty-button:hover,.difficulty-button:focus-visible{transform:translateY(-3px);border-color:#8fe8ff;background:#17355a;outline:0}
+.difficulty-button small{display:block;margin-top:6px;color:#9db0ca;font-size:10px;font-weight:normal}
 @keyframes playAgainIn{
   from{opacity:0;transform:translate(-50%,-35%) scale(.8)}
   to{opacity:1;transform:translate(-50%,-50%) scale(1)}
@@ -148,6 +185,8 @@ canvas{
     touch-action:none;
     user-select:none;
   }
+  .kick-button{border-color:rgba(255,176,74,.72);background:rgba(61,29,20,.88)}
+    .thunder-button{border-color:rgba(121,221,255,.78);background:rgba(16,47,70,.88);font-size:10px}
   .touch-button:active{
     background:#b63855;
     transform:translateY(2px);
@@ -182,9 +221,14 @@ canvas{
       height:36px;
     }
     .power-button{
-      width:48px;
-      height:48px;
-      font-size:11px;
+      width:40px;
+      height:40px;
+      font-size:10px;
+    }
+    .thunder-button{
+      width:40px;
+      height:40px;
+      font-size:8px;
     }
     .touch-group{
       gap:6px;
@@ -216,7 +260,18 @@ canvas{
 <body>
 <div class="shell">
 <canvas id="game" width="1200" height="675"></canvas>
-<div class="controls">A / D or ← / → move · Space / W / ↑ jump · J Rasengan · F Fire Style · K Nine-Tails (2 sec, 6 sec cooldown) · R restart</div>
+<div class="controls">A / D or ← / → move · Space / W / ↑ jump · J Rasengan · F Fire Style · L Tornado Kick · T Thunderstorm · K Nine-Tails · R restart</div>
+<div class="start-menu" id="start-menu">
+  <div class="start-card">
+    <h1>NARUTO: SHADOW RUN</h1>
+    <p>Choose your challenge before facing Pain.</p>
+    <div class="difficulty-list">
+      <button class="difficulty-button" data-difficulty="easy">EASY<small>Same HP · slower Pain</small></button>
+      <button class="difficulty-button" data-difficulty="normal">NORMAL<small>Same HP · strong Pain</small></button>
+      <button class="difficulty-button" data-difficulty="hard">HARD<small>Same HP · insane Pain</small></button>
+    </div>
+  </div>
+</div>
 </div>
 <div class="touch-controls" aria-label="Mobile game controls">
   <div class="joystick" id="joystick" aria-label="Move joystick">
@@ -226,6 +281,8 @@ canvas{
     <button class="touch-button power-button" data-action="jump" aria-label="Jump">JUMP</button>
     <button class="touch-button power-button" data-action="rasengan" aria-label="Rasengan">RAS</button>
     <button class="touch-button power-button" data-action="fire" aria-label="Fire Style">FIRE</button>
+    <button class="touch-button power-button kick-button" data-action="kick" aria-label="Tornado Kick">KICK</button>
+    <button class="touch-button power-button thunder-button" data-action="thunder" aria-label="Thunderstorm">THUNDER</button>
     <button class="touch-button power-button" data-action="nine" aria-label="Nine-Tails">9T</button>
   </div>
 </div>
@@ -246,6 +303,7 @@ canvas{
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const playAgainButton = document.getElementById("play-again");
+const startMenu = document.getElementById("start-menu");
 
 const GAME = {
   width: canvas.width,
@@ -253,6 +311,22 @@ const GAME = {
   gravity: 0.68,
   maxFallSpeed: 15
 };
+
+const PERFORMANCE={
+  low:
+    window.matchMedia("(pointer: coarse)").matches ||
+    (navigator.hardwareConcurrency || 8)<=4,
+  maxParticles:window.matchMedia("(pointer: coarse)").matches ? 150 : 240,
+  starCount:window.matchMedia("(pointer: coarse)").matches ? 80 : 120
+};
+
+const DIFFICULTIES = {
+  easy: {label:"EASY", fighterHp:120, bossSpeed:1.35, attackDelay:118, projectileDamage:10, projectileSpeed:4.7, playerDamage:.92, painThunderDelay:600},
+  normal: {label:"NORMAL", fighterHp:120, bossSpeed:1.8, attackDelay:82, projectileDamage:15, projectileSpeed:5.5, playerDamage:.82, painThunderDelay:480},
+  hard: {label:"HARD", fighterHp:120, bossSpeed:2.25, attackDelay:58, projectileDamage:22, projectileSpeed:6.4, playerDamage:.72, painThunderDelay:300}
+};
+let difficultyKey="normal";
+let difficulty=DIFFICULTIES.normal;
 
 ctx.imageSmoothingEnabled = true;
 
@@ -269,12 +343,13 @@ function loadCharacterImage(image,path,name){
 
 loadCharacterImage(images.naruto,"assets/naruto.jpg","Naruto");
 loadCharacterImage(images.pain,"assets/pain.jpg","Pain");
-
 const keys = Object.create(null);
 const particles = [];
 const projectiles = [];
 const enemyProjectiles = [];
 const fireballs = [];
+const tornadoKicks = [];
+const thunderStrikes = [];
 const sounds = {
   background: new Audio("sounds/mixkit-sports-highlights-51.mp3"),
   nineTails: new Audio("sounds/mixkit-body-cutting-impact-2199.wav"),
@@ -313,11 +388,12 @@ let musicTimer=null;
 let backgroundFadeTimer=null;
 
 let score = 0;
-let state = "playing";
+let state = "menu";
 let frame = 0;
 let shake = 0;
 let countdownFrames = 0;
 let painSoundCooldown = 0;
+let lastAbilityUiFrame=-30;
 
 /* -------------------------
    World
@@ -338,7 +414,7 @@ const orbs = [
   {x:1020,y:390,phase:3,collected:false}
 ];
 
-const stars = Array.from({length:140},()=>({
+const stars = Array.from({length:PERFORMANCE.starCount},()=>({
   x:Math.random()*GAME.width,
   y:Math.random()*GAME.height*.58,
   r:Math.random()*1.5+.25,
@@ -379,6 +455,9 @@ const player = {
   nineTailsTimer:0,
   nineTailsCooldown:0,
   attackPose:0,
+  kickCooldown:0,
+  kickPose:0,
+  thunderCooldown:0,
 
   spawnX:90
 };
@@ -399,6 +478,7 @@ const boss = {
 
   hitFlash:0,
   attackCooldown:0,
+  thunderCooldown:480,
   speed:1.8,
   vy:0,
   previousY:0,
@@ -437,6 +517,10 @@ function respawnPlayer(){
 }
 
 function createParticle(x,y,type){
+  if(particles.length>=PERFORMANCE.maxParticles){
+    return;
+  }
+
   const angle=Math.random()*Math.PI*2;
   const speed=Math.random()*4+1;
 
@@ -496,7 +580,9 @@ window.addEventListener("keydown",event=>{
     "d",
     "j",
     "k",
-    "f"
+    "f",
+    "l",
+    "t"
   ].includes(key)){
     event.preventDefault();
   }
@@ -525,6 +611,14 @@ window.addEventListener("keydown",event=>{
     fireFireball();
   }
 
+  if(key==="l" && !event.repeat){
+    fireTornadoKick();
+  }
+
+  if(key==="t" && !event.repeat){
+    fireThunderstorm("player");
+  }
+
   if(
     key==="k" &&
     !event.repeat &&
@@ -544,7 +638,7 @@ window.addEventListener("keydown",event=>{
   }
 
   if(key==="r" && state!=="playing"){
-    resetGame();
+    showStartMenu();
   }
 });
 
@@ -554,7 +648,14 @@ window.addEventListener("keyup",event=>{
 
 playAgainButton.addEventListener("click",()=>{
   startBackgroundMusic();
-  resetGame();
+  showStartMenu();
+});
+
+document.querySelectorAll(".difficulty-button").forEach(button=>{
+  button.addEventListener("click",()=>{
+    startBackgroundMusic();
+    startGame(button.dataset.difficulty);
+  });
 });
 
 document.querySelectorAll(".touch-button").forEach(button=>{
@@ -578,6 +679,10 @@ document.querySelectorAll(".touch-button").forEach(button=>{
       fireRasengan();
     }else if(action==="fire"){
       fireFireball();
+    }else if(action==="kick"){
+      fireTornadoKick();
+    }else if(action==="thunder"){
+      fireThunderstorm("player");
     }else if(
       action==="nine" &&
       state==="playing" &&
@@ -758,6 +863,18 @@ function updatePlayer(){
     player.attackCooldown--;
   }
 
+  if(player.kickCooldown>0){
+    player.kickCooldown--;
+  }
+
+  if(player.thunderCooldown>0){
+    player.thunderCooldown--;
+  }
+
+  if(player.kickPose>0){
+    player.kickPose--;
+  }
+
   if(player.fireCooldown>0){
     player.fireCooldown--;
   }
@@ -782,7 +899,13 @@ function updatePlayer(){
 }
 
 function updateAbilityButtons(){
+  if(frame-lastAbilityUiFrame<6){
+    return;
+  }
+  lastAbilityUiFrame=frame;
+
   const fireButton=document.querySelector('[data-action="fire"]');
+  const kickButton=document.querySelector('[data-action="kick"]');
   const nineButton=document.querySelector('[data-action="nine"]');
 
   if(fireButton){
@@ -791,6 +914,21 @@ function updateAbilityButtons(){
       ? "FIRE"
       : `FIRE ${Math.ceil(player.fireCooldown/60)}s`;
     fireButton.classList.toggle("cooldown",!fireReady);
+  }
+
+  if(kickButton){
+    const kickReady=player.kickCooldown===0;
+    kickButton.textContent=kickReady ? "KICK" : `KICK ${Math.ceil(player.kickCooldown/60)}s`;
+    kickButton.classList.toggle("cooldown",!kickReady);
+  }
+
+  const thunderButton=document.querySelector('[data-action="thunder"]');
+  if(thunderButton){
+    const thunderReady=player.thunderCooldown===0;
+    thunderButton.textContent=thunderReady
+      ? "THUNDER"
+      : `THUNDER ${Math.ceil(player.thunderCooldown/60)}s`;
+    thunderButton.classList.toggle("cooldown",!thunderReady);
   }
 
   if(nineButton){
@@ -867,7 +1005,7 @@ function fireRasengan(){
     radius:nineTails ? 17 : 13,
     life:90,
     rotation:0,
-    damage:5
+    damage:Math.round(5*difficulty.playerDamage)
   });
 
   burst(
@@ -907,7 +1045,7 @@ function fireNineTailsBlast(){
     radius:26,
     life:75,
     rotation:0,
-    damage:10,
+    damage:Math.round(10*difficulty.playerDamage),
     type:"nineTails"
   });
 }
@@ -940,6 +1078,60 @@ function fireFireball(){
   burst(startX,startY,24,"fire");
 }
 
+function fireTornadoKick(){
+  if(state!=="playing" || player.kickCooldown>0){
+    return;
+  }
+
+  player.kickCooldown=52;
+  player.kickPose=18;
+
+  const kickX=player.x+(player.direction>0 ? player.width : -112);
+  const kickBox={x:kickX,y:player.y+14,width:112,height:player.height-18};
+  tornadoKicks.push({x:player.x+player.width/2+player.direction*42,y:player.y+player.height*.53,direction:player.direction,life:16});
+
+  if(boss.hp>0 && rectsOverlap(kickBox,boss)){
+    const damage=Math.round(17*difficulty.playerDamage);
+    boss.hp-=damage;
+    boss.hitFlash=14;
+    boss.vx=player.direction*4.5;
+    score+=55;
+    shake=10;
+    burst(kickBox.x+kickBox.width/2,kickBox.y+kickBox.height/2,32,"kick");
+
+    if(boss.hp<=0){
+      score+=500;
+      state="won";
+      burst(boss.x+boss.width/2,boss.y+boss.height/2,90,"win");
+    }
+  }
+}
+
+function fireThunderstorm(owner){
+  if(state!=="playing"){
+    return;
+  }
+
+  if(owner==="player"){
+    if(player.thunderCooldown>0){
+      return;
+    }
+    player.thunderCooldown=480;
+  }
+
+  const target=owner==="player" ? boss : player;
+  thunderStrikes.push({
+    x:target.x+target.width/2,
+    y:target.y+target.height*.45,
+    owner,
+    damage:50,
+    warning:45,
+    rotation:Math.random()*Math.PI*2,
+    resolved:false
+  });
+  burst(target.x+target.width/2,target.y+target.height*.45,26,"thunder");
+}
+
 function firePainProjectile(angleOffset=0){
   const startX=boss.x+boss.width/2;
   const startY=boss.y+boss.height*.42;
@@ -952,8 +1144,8 @@ function firePainProjectile(angleOffset=0){
   enemyProjectiles.push({
     x:startX,
     y:startY,
-    vx:Math.cos(angle)*speed,
-    vy:Math.sin(angle)*speed,
+    vx:Math.cos(angle)*difficulty.projectileSpeed,
+    vy:Math.sin(angle)*difficulty.projectileSpeed,
     radius:12,
     life:150,
     rotation:0,
@@ -961,6 +1153,46 @@ function firePainProjectile(angleOffset=0){
   });
 
   burst(startX,startY,14,"painAttack");
+}
+
+function firePainShockwave(){
+  const direction=Math.sign(player.x-boss.x) || -1;
+  enemyProjectiles.push({
+    x:boss.x+boss.width/2+direction*34,
+    y:boss.y+boss.height-18,
+    vx:direction*7.2,
+    vy:0,
+    radius:17,
+    life:120,
+    rotation:0,
+    type:"painWave",
+    damage:Math.round(difficulty.projectileDamage*.8)
+  });
+  burst(boss.x+boss.width/2,boss.y+boss.height-18,20,"painAttack");
+}
+
+function firePainShurikenBurst(){
+  const startX=boss.x+boss.width/2;
+  const startY=boss.y+boss.height*.42;
+  const targetX=player.x+player.width/2;
+  const targetY=player.y+player.height*.45;
+  const baseAngle=Math.atan2(targetY-startY,targetX-startX);
+
+  for(let index=-2;index<=2;index++){
+    const angle=baseAngle+index*.16;
+    enemyProjectiles.push({
+      x:startX,
+      y:startY,
+      vx:Math.cos(angle)*6.2,
+      vy:Math.sin(angle)*6.2,
+      radius:9,
+      life:125,
+      rotation:angle,
+      type:"painShuriken",
+      damage:Math.round(difficulty.projectileDamage*.7)
+    });
+  }
+  burst(startX,startY,22,"painAttack");
 }
 
 function launchPainToWood(){
@@ -1016,6 +1248,8 @@ function updateProjectiles(){
       width:shot.radius*2,
       height:shot.radius*2
     };
+
+    const damage=shot.damage || difficulty.projectileDamage;
 
     const bossBox={
       x:boss.x,
@@ -1095,7 +1329,7 @@ function updateFireballs(){
     };
 
     if(boss.hp>0 && rectsOverlap(hitbox,bossBox)){
-      boss.hp-=8;
+      boss.hp-=Math.round(8*difficulty.playerDamage);
       boss.hitFlash=12;
       launchPainToWood();
       score+=40;
@@ -1117,6 +1351,51 @@ function updateFireballs(){
   }
 }
 
+function updateTornadoKicks(){
+  for(let i=tornadoKicks.length-1;i>=0;i--){
+    tornadoKicks[i].life--;
+    if(tornadoKicks[i].life<=0){
+      tornadoKicks.splice(i,1);
+    }
+  }
+}
+
+function updateThunderstorms(){
+  for(let i=thunderStrikes.length-1;i>=0;i--){
+    const strike=thunderStrikes[i];
+    strike.warning--;
+    strike.rotation+=.35;
+
+    if(strike.warning<=0 && !strike.resolved){
+      strike.resolved=true;
+
+      if(strike.owner==="player" && boss.hp>0){
+        boss.hp-=strike.damage;
+        boss.hitFlash=20;
+        score+=100;
+        shake=18;
+        burst(strike.x,strike.y,60,"thunder");
+
+        if(boss.hp<=0){
+          score+=500;
+          state="won";
+          burst(boss.x+boss.width/2,boss.y+boss.height/2,90,"win");
+        }
+      }else if(strike.owner==="boss"){
+        if(damagePlayer(strike.damage)){
+          playPainAttackSound();
+        }
+        shake=18;
+        burst(strike.x,strike.y,60,"thunder");
+      }
+    }
+
+    if(strike.warning<=-16){
+      thunderStrikes.splice(i,1);
+    }
+  }
+}
+
 function updateEnemyProjectiles(){
   for(let i=enemyProjectiles.length-1;i>=0;i--){
     const shot=enemyProjectiles[i];
@@ -1133,6 +1412,8 @@ function updateEnemyProjectiles(){
       height:shot.radius*2
     };
 
+    const damage=shot.damage || difficulty.projectileDamage;
+
     if(
       shot.life<=0 ||
       shot.x<-60 ||
@@ -1145,7 +1426,7 @@ function updateEnemyProjectiles(){
     }
 
     if(rectsOverlap(hitbox,player)){
-      if(damagePlayer(5)){
+      if(damagePlayer(damage)){
         playPainAttackSound();
       }
       burst(shot.x,shot.y,22,"damage");
@@ -1167,7 +1448,7 @@ function updateBoss(){
   const targetDistance=player.x-boss.x;
 
   if(Math.abs(targetDistance)>110){
-    boss.vx=Math.sign(targetDistance)*(enraged ? 3 : boss.speed);
+    boss.vx=Math.sign(targetDistance)*(enraged ? difficulty.bossSpeed+0.45 : difficulty.bossSpeed);
   }
 
   boss.x+=boss.vx;
@@ -1217,6 +1498,13 @@ function updateBoss(){
     boss.attackCooldown--;
   }
 
+  if(boss.thunderCooldown>0){
+    boss.thunderCooldown--;
+  }else{
+    fireThunderstorm("boss");
+    boss.thunderCooldown=difficulty.painThunderDelay;
+  }
+
   const bossBox={
     x:boss.x,
     y:boss.y,
@@ -1227,16 +1515,29 @@ function updateBoss(){
   if(boss.attackCooldown===0){
     if(rectsOverlap(player,bossBox)){
       boss.attackCooldown=60;
-      if(damagePlayer(5)){
+      if(damagePlayer(difficulty.projectileDamage+2)){
         playPainAttackSound();
       }
     }else{
-      boss.attackCooldown=enraged ? 58 : 95;
-      firePainProjectile();
+      boss.attackCooldown=enraged ? Math.max(34,difficulty.attackDelay-24) : difficulty.attackDelay;
+      const pattern=Math.floor(frame/Math.max(1,difficulty.attackDelay))%3;
+
+      if(pattern===0){
+        firePainProjectile();
+        if(enraged){
+          firePainProjectile(-.22);
+          firePainProjectile(.22);
+        }
+      }else if(pattern===1){
+        firePainShockwave();
+        if(enraged){
+          firePainProjectile();
+        }
+      }else{
+        firePainShurikenBurst();
+      }
 
       if(enraged){
-        firePainProjectile(-.22);
-        firePainProjectile(.22);
         shake=10;
       }
     }
@@ -1534,6 +1835,17 @@ function drawPlatforms(){
 ------------------------- */
 
 function drawGlow(x,y,r,color){
+  if(PERFORMANCE.low){
+    ctx.save();
+    ctx.globalAlpha=.28;
+    ctx.fillStyle=color;
+    ctx.beginPath();
+    ctx.arc(x,y,r*.55,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
   const gradient=ctx.createRadialGradient(
     x,y,0,
     x,y,r
@@ -1636,6 +1948,9 @@ function drawShadowFighter(
   ctx.translate(x+width/2,y+height/2);
   ctx.scale(direction,1);
   ctx.rotate(lean);
+  ctx.beginPath();
+  ctx.rect(-width/2,-height/2,width,height);
+  ctx.clip();
   ctx.lineCap="round";
   ctx.lineJoin="round";
 
@@ -1890,15 +2205,17 @@ function drawPlayer(){
     "naruto",
     player.direction,
     frame*.32,
-    player.attackPose,
+    Math.max(player.attackPose,player.kickPose),
     !player.grounded,
     0
   );
 
   ctx.strokeStyle="#ff9d38";
   ctx.lineWidth=3;
-  ctx.shadowBlur=17;
-  ctx.shadowColor="#ff7518";
+  if(!PERFORMANCE.low){
+    ctx.shadowBlur=17;
+    ctx.shadowColor="#ff7518";
+  }
 
   ctx.strokeRect(
     x+2,
@@ -2113,8 +2430,106 @@ function drawFireballs(){
   }
 }
 
+function drawTornadoKicks(){
+  for(const kick of tornadoKicks){
+    const progress=1-kick.life/16;
+    ctx.save();
+    ctx.translate(kick.x,kick.y);
+    ctx.scale(kick.direction,1);
+    ctx.globalAlpha=Math.max(.15,1-progress);
+    ctx.strokeStyle="#ffd166";
+    ctx.lineWidth=5;
+    ctx.shadowBlur=18;
+    ctx.shadowColor="#ff8b2d";
+    ctx.beginPath();
+    ctx.arc(0,0,25+progress*48,-.95,.95);
+    ctx.stroke();
+    ctx.strokeStyle="#8fe8ff";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.arc(4,0,39+progress*34,-.8,.8);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawThunderstorms(){
+  for(const strike of thunderStrikes){
+    const warningProgress=clamp(1-strike.warning/45,0,1);
+    const impactProgress=strike.warning<=0
+      ? clamp(1+strike.warning/16,0,1)
+      : 0;
+
+    ctx.save();
+    ctx.globalAlpha=strike.warning>0 ? .45+.35*Math.sin(frame*.5) : 1-impactProgress;
+    const isPainStrike=strike.owner==="boss";
+    ctx.strokeStyle=isPainStrike ? "#ff68d5" : "#8fe8ff";
+    ctx.lineWidth=3+warningProgress*4;
+    if(!PERFORMANCE.low){
+      ctx.shadowBlur=24;
+      ctx.shadowColor=isPainStrike ? "#ff2fae" : "#47cfff";
+    }
+    ctx.beginPath();
+    ctx.moveTo(strike.x,0);
+    ctx.lineTo(strike.x-13,strike.y*.35);
+    ctx.lineTo(strike.x+10,strike.y*.68);
+    ctx.lineTo(strike.x,strike.y);
+    ctx.stroke();
+
+    ctx.strokeStyle=isPainStrike ? "#ffd0f4" : "#e9fbff";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.arc(strike.x,strike.y,28+impactProgress*62,0,Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function drawEnemyProjectiles(){
   for(const shot of enemyProjectiles){
+    if(shot.type==="painWave"){
+      ctx.save();
+      ctx.globalAlpha=.9;
+      ctx.strokeStyle="#ff4fd8";
+      ctx.shadowBlur=18;
+      ctx.shadowColor="#ff2bbd";
+      ctx.lineWidth=6;
+      ctx.beginPath();
+      ctx.moveTo(shot.x-24,shot.y+8);
+      ctx.quadraticCurveTo(shot.x,shot.y-22,shot.x+24,shot.y+8);
+      ctx.stroke();
+      ctx.strokeStyle="#ffd1f4";
+      ctx.lineWidth=2;
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+
+    if(shot.type==="painShuriken"){
+      ctx.save();
+      ctx.translate(shot.x,shot.y);
+      ctx.rotate(shot.rotation+frame*.12);
+      ctx.fillStyle="#ff5ed8";
+      ctx.strokeStyle="#ffd1f4";
+      ctx.lineWidth=2;
+      ctx.shadowBlur=14;
+      ctx.shadowColor="#ff2bbd";
+      ctx.beginPath();
+      ctx.moveTo(0,-shot.radius*1.8);
+      ctx.lineTo(shot.radius*.55,-shot.radius*.35);
+      ctx.lineTo(shot.radius*1.8,0);
+      ctx.lineTo(shot.radius*.55,shot.radius*.35);
+      ctx.lineTo(0,shot.radius*1.8);
+      ctx.lineTo(-shot.radius*.55,shot.radius*.35);
+      ctx.lineTo(-shot.radius*1.8,0);
+      ctx.lineTo(-shot.radius*.55,-shot.radius*.35);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+
     drawGlow(
       shot.x,
       shot.y,
@@ -2164,6 +2579,10 @@ function drawParticles(){
       ctx.fillStyle="#ff6a1f";
     }else if(particle.type==="nineTails"){
       ctx.fillStyle="#ff392b";
+    }else if(particle.type==="kick"){
+      ctx.fillStyle="#ffd166";
+    }else if(particle.type==="thunder"){
+      ctx.fillStyle="#a8f3ff";
     }else if(particle.type==="orb"){
       ctx.fillStyle="#6edcff";
     }else{
@@ -2223,6 +2642,10 @@ function drawUI(){
     "Score: "+score,
     34,70
   );
+
+  ctx.fillStyle="#ffb454";
+  ctx.font="bold 12px Arial";
+  ctx.fillText("MODE: "+difficulty.label,190,70);
 
   const creatorPulse=
     .72+
@@ -2434,14 +2857,30 @@ function drawCountdown(){
    Reset
 ------------------------- */
 
+function showStartMenu(){
+  state="menu";
+  playAgainButton.classList.remove("visible");
+  startMenu.classList.remove("hidden");
+}
+
+function startGame(selectedDifficulty){
+  difficultyKey=DIFFICULTIES[selectedDifficulty] ? selectedDifficulty : "normal";
+  difficulty=DIFFICULTIES[difficultyKey];
+  startMenu.classList.add("hidden");
+  resetGame();
+}
+
 function resetGame(){
   score=0;
   state="countdown";
   frame=0;
   shake=0;
   countdownFrames=210;
+  lastAbilityUiFrame=-30;
   playAgainButton.classList.remove("visible");
 
+  player.hp=player.maxHp;
+  player.maxHp=difficulty.fighterHp;
   player.hp=player.maxHp;
   player.vx=0;
   player.vy=0;
@@ -2452,12 +2891,18 @@ function resetGame(){
   player.nineTailsTimer=0;
   player.nineTailsCooldown=0;
   player.attackPose=0;
+  player.kickCooldown=0;
+  player.kickPose=0;
+  player.thunderCooldown=0;
 
   boss.x=900;
   boss.vx=1.45;
+  boss.maxHp=difficulty.fighterHp;
   boss.hp=boss.maxHp;
+  boss.speed=difficulty.bossSpeed;
   boss.hitFlash=0;
   boss.attackCooldown=0;
+  boss.thunderCooldown=difficulty.painThunderDelay;
   boss.vy=0;
   boss.previousY=0;
   boss.grounded=true;
@@ -2466,6 +2911,8 @@ function resetGame(){
   projectiles.length=0;
   fireballs.length=0;
   enemyProjectiles.length=0;
+  tornadoKicks.length=0;
+  thunderStrikes.length=0;
   particles.length=0;
 
   for(const orb of orbs){
@@ -2525,6 +2972,8 @@ function update(){
     updateBoss();
     updateProjectiles();
     updateFireballs();
+    updateTornadoKicks();
+    updateThunderstorms();
     updateEnemyProjectiles();
     updateOrbs();
   }
@@ -2551,6 +3000,8 @@ function draw(){
   drawOrbs();
   drawProjectiles();
   drawFireballs();
+  drawTornadoKicks();
+  drawThunderstorms();
   drawEnemyProjectiles();
   drawBoss();
   drawPlayer();
@@ -2571,7 +3022,7 @@ function gameLoop(){
   requestAnimationFrame(gameLoop);
 }
 
-resetGame();
+showStartMenu();
 gameLoop();
 </script>
 </body>
