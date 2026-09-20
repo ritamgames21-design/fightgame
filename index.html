@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -110,15 +111,28 @@ canvas{
 .difficulty-list{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .difficulty-button{
   min-height:68px;
-  border:1px solid rgba(255,255,255,.22);
-  border-radius:12px;
-  color:#fff;
-  background:rgba(7,15,33,.82);
+  border:1px solid rgba(116,176,255,.28);
+  border-radius:18px;
+  color:#f3f9ff;
+  background:linear-gradient(180deg,rgba(19,34,58,.96),rgba(7,15,33,.88));
   cursor:pointer;
   font:bold 15px Arial,sans-serif;
-  transition:transform .18s ease,background .18s ease,border-color .18s ease;
+  letter-spacing:.5px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 10px 18px rgba(0,0,0,.22);
+  transition:transform .18s ease,background .18s ease,border-color .18s ease,box-shadow .18s ease;
 }
-.difficulty-button:hover,.difficulty-button:focus-visible{transform:translateY(-3px);border-color:#8fe8ff;background:#17355a;outline:0}
+.difficulty-button:hover,.difficulty-button:focus-visible{
+  transform:translateY(-3px);
+  border-color:#8fe8ff;
+  background:linear-gradient(180deg,#1d4470,#142b4a);
+  box-shadow:0 12px 22px rgba(79,176,255,.18),inset 0 1px 0 rgba(255,255,255,.14);
+  outline:0;
+}
+.difficulty-button.active{
+  border-color:#8fe8ff;
+  background:linear-gradient(180deg,#1b7fcf,#0d3d73);
+  box-shadow:0 0 0 1px rgba(255,255,255,.14),0 0 24px rgba(90,195,255,.3),0 14px 26px rgba(0,0,0,.28);
+}
 .difficulty-button small{display:block;margin-top:6px;color:#9db0ca;font-size:10px;font-weight:normal}
 @keyframes playAgainIn{
   from{opacity:0;transform:translate(-50%,-35%) scale(.8)}
@@ -176,9 +190,9 @@ canvas{
     width:48px;
     height:48px;
     border:2px solid rgba(255,255,255,.62);
-    border-radius:7px;
+    border-radius:18px;
     color:#e9faff;
-    background:rgba(18,27,38,.82);
+    background:linear-gradient(180deg,rgba(26,38,52,.9),rgba(13,17,25,.88));
     box-shadow:0 4px 12px rgba(0,0,0,.48),inset 0 0 10px rgba(126,215,255,.12);
     font:bold 22px Arial,sans-serif;
     pointer-events:auto;
@@ -214,12 +228,12 @@ canvas{
   .shoulder-button,.system-button{
     min-width:82px;
     height:42px;
-    padding:0 6px;
+    padding:0 10px;
     border:2px solid rgba(255,255,255,.5);
-    border-radius:6px;
+    border-radius:18px;
     color:#eafaff;
-    background:rgba(13,22,34,.78);
-    box-shadow:0 4px 12px rgba(0,0,0,.42);
+    background:linear-gradient(180deg,rgba(21,37,52,.92),rgba(8,15,23,.9));
+    box-shadow:0 4px 12px rgba(0,0,0,.42),inset 0 0 10px rgba(255,255,255,.06);
     font:bold 9px Arial,sans-serif;
     touch-action:none;
   }
@@ -246,9 +260,9 @@ canvas{
     width:54px;
     height:54px;
     border:2px solid rgba(255,255,255,.72);
-    border-radius:50%;
+    border-radius:18px;
     color:#fff;
-    background:rgba(10,23,31,.8);
+    background:linear-gradient(180deg,rgba(17,30,42,.9),rgba(8,16,23,.88));
     box-shadow:0 5px 16px rgba(0,0,0,.48);
     font:bold 18px Arial,sans-serif;
     touch-action:none;
@@ -317,14 +331,14 @@ canvas{
 <div class="shell">
 <canvas id="game" width="1200" height="675"></canvas>
 <button class="mobile-pause" id="mobile-pause" type="button" aria-label="Pause game">Ⅱ</button>
-<div class="controls">A / D or ← / → move · Space / W / ↑ jump · J Rasengan (4 DMG) · H Beam · F Fire Style · L Tornado Kick · T Thunderstorm · K Nine-Tails · R restart</div>
+<div class="controls">A / D or ← / → move · Space / W / ↑ jump · Shift Blink · J Rasengan (5 DMG) · H Beam · F Fire Style · L Tornado Kick · T Thunderstorm · K Nine-Tails · R restart</div>
 <div class="start-menu" id="start-menu">
   <div class="start-card">
     <h1>NARUTO: SHADOW RUN</h1>
     <p>Choose your challenge before facing Pain.</p>
     <div class="difficulty-list">
       <button class="difficulty-button" data-difficulty="easy">EASY<small>Same HP · slower Pain</small></button>
-      <button class="difficulty-button" data-difficulty="normal">NORMAL<small>Same HP · strong Pain</small></button>
+      <button class="difficulty-button active" data-difficulty="normal">NORMAL<small>Same HP · strong Pain</small></button>
       <button class="difficulty-button" data-difficulty="hard">HARD<small>Same HP · insane Pain</small></button>
     </div>
   </div>
@@ -342,12 +356,15 @@ canvas{
   <div class="shoulder-controls" aria-label="Power controls">
     <div class="shoulder-group">
       <div class="power-control"><button class="shoulder-button touch-button" data-action="rasengan" aria-label="Rasengan">RASENGAN</button></div>
+      <div class="power-control"><button class="shoulder-button touch-button" data-action="blink" aria-label="Blink">BLINK</button></div>
       <div class="power-control"><button class="shoulder-button touch-button" data-action="fire" aria-label="Fire Style">FIRE STYLE</button></div>
-      <div class="power-control"><button class="shoulder-button touch-button" data-action="kick" aria-label="Tornado Kick">TORNADO KICK</button></div>
     </div>
     <div class="shoulder-group">
+      <div class="power-control"><button class="shoulder-button touch-button" data-action="kick" aria-label="Tornado Kick">TORNADO KICK</button></div>
       <div class="power-control"><button class="shoulder-button touch-button" data-action="thunder" aria-label="Thunderstorm">THUNDERSTORM</button></div>
       <div class="power-control"><button class="shoulder-button touch-button" data-action="nine" aria-label="Nine-Tails">NINE-TAILS</button></div>
+    </div>
+    <div class="shoulder-group">
       <div class="power-control"><button class="shoulder-button touch-button" data-action="beam" aria-label="Beam">BEAM</button></div>
     </div>
   </div>
@@ -388,9 +405,9 @@ const PERFORMANCE={
 };
 
 const DIFFICULTIES = {
-  easy: {label:"EASY", fighterHp:120, bossSpeed:1.5, attackDelay:110, projectileDamage:16, projectileSpeed:4.9, powerScale:1.15, enemyPowerScale:1.25, enemyBeamCooldown:210, painThunderDelay:420},
-  normal: {label:"NORMAL", fighterHp:120, bossSpeed:2.0, attackDelay:74, projectileDamage:25, projectileSpeed:5.8, powerScale:1.3, enemyPowerScale:1.65, enemyBeamCooldown:150, painThunderDelay:300},
-  hard: {label:"HARD", fighterHp:120, bossSpeed:2.45, attackDelay:52, projectileDamage:36, projectileSpeed:6.8, powerScale:1.45, enemyPowerScale:2.0, enemyBeamCooldown:100, painThunderDelay:180}
+  easy: {label:"EASY", fighterHp:140, bossSpeed:1.7, attackDelay:120, projectileDamage:14, projectileSpeed:4.6, powerScale:1.1, enemyPowerScale:1.15, enemyBeamCooldown:220, painThunderDelay:440},
+  normal: {label:"NORMAL", fighterHp:120, bossSpeed:2.4, attackDelay:66, projectileDamage:28, projectileSpeed:6.4, powerScale:1.4, enemyPowerScale:1.8, enemyBeamCooldown:135, painThunderDelay:260},
+  hard: {label:"HARD", fighterHp:120, bossSpeed:2.8, attackDelay:50, projectileDamage:40, projectileSpeed:7.3, powerScale:1.6, enemyPowerScale:2.1, enemyBeamCooldown:90, painThunderDelay:150}
 };
 let difficultyKey="normal";
 let difficulty=DIFFICULTIES.normal;
@@ -562,6 +579,8 @@ const player = {
   kickPose:0,
   thunderCooldown:0,
   beamCooldown:0,
+  blinkCooldown:0,
+  blinkFlash:0,
 
   spawnX:90
 };
@@ -584,6 +603,8 @@ const boss = {
   attackCooldown:0,
   thunderCooldown:480,
   beamCooldown:180,
+  blinkCooldown:0,
+  blinkFlash:0,
   speed:1.8,
   vy:0,
   previousY:0,
@@ -695,7 +716,8 @@ window.addEventListener("keydown",event=>{
     "f",
     "l",
     "t",
-    "h"
+    "h",
+    "shift"
   ].includes(key)){
     event.preventDefault();
   }
@@ -736,6 +758,10 @@ window.addEventListener("keydown",event=>{
     fireKamehameha("player");
   }
 
+  if(key==="shift" && !event.repeat){
+    triggerPlayerBlink();
+  }
+
   if(
     key==="k" &&
     !event.repeat &&
@@ -768,11 +794,22 @@ playAgainButton.addEventListener("click",()=>{
   showStartMenu();
 });
 
+function updateDifficultyButtons(){
+  document.querySelectorAll(".difficulty-button").forEach(button=>{
+    const isActive = button.dataset.difficulty === difficultyKey;
+    button.classList.toggle("active", isActive);
+  });
+}
+
 document.querySelectorAll(".difficulty-button").forEach(button=>{
   button.addEventListener("click",()=>{
+    const nextDifficulty = button.dataset.difficulty;
+    difficultyKey = DIFFICULTIES[nextDifficulty] ? nextDifficulty : "normal";
+    difficulty = DIFFICULTIES[difficultyKey];
+    updateDifficultyButtons();
     requestLandscapeMode();
     startBackgroundMusic();
-    startGame(button.dataset.difficulty);
+    startGame(nextDifficulty);
   });
 });
 
@@ -800,6 +837,8 @@ document.querySelectorAll(".touch-button").forEach(button=>{
       fireRasengan();
     }else if(action==="fire"){
       fireFireball();
+    }else if(action==="blink"){
+      triggerPlayerBlink();
     }else if(action==="kick"){
       fireTornadoKick();
     }else if(action==="thunder"){
@@ -892,6 +931,48 @@ joystick.addEventListener("pointercancel",()=>{
 /* -------------------------
    Player
 ------------------------- */
+
+function triggerPlayerBlink(){
+  if(state!=="playing" || player.blinkCooldown>0){
+    return;
+  }
+
+  const dashDistance=180;
+  const targetX=clamp(
+    player.x + player.direction * dashDistance,
+    0,
+    GAME.width-player.width
+  );
+
+  player.x=targetX;
+  player.vx=player.direction*18;
+  player.blinkCooldown=200;
+  player.blinkFlash=12;
+  player.invulnerable=Math.max(player.invulnerable,18);
+  burst(player.x+player.width/2,player.y+player.height*.5,30,"chakra");
+  shake=12;
+}
+
+function triggerBossBlink(){
+  if(state!=="playing" || boss.hp<=0 || boss.blinkCooldown>0){
+    return;
+  }
+
+  const dir=Math.sign(player.x-boss.x) || 1;
+  const blinkDistance=160;
+  const targetX=clamp(
+    boss.x + dir * blinkDistance,
+    90,
+    GAME.width-boss.width-90
+  );
+
+  boss.x=targetX;
+  boss.vx=dir*7;
+  boss.blinkCooldown=240;
+  boss.blinkFlash=14;
+  burst(boss.x+boss.width/2,boss.y+boss.height*.46,28,"painAttack");
+  shake=14;
+}
 
 function updatePlayer(){
   player.previousY=player.y;
@@ -1001,6 +1082,14 @@ function updatePlayer(){
     }
   }
 
+  if(player.blinkCooldown>0){
+    player.blinkCooldown--;
+  }
+
+  if(player.blinkFlash>0){
+    player.blinkFlash--;
+  }
+
   if(player.attackCooldown>0){
     player.attackCooldown--;
   }
@@ -1052,11 +1141,17 @@ function updateAbilityButtons(){
 
   const fireButtons=document.querySelectorAll('[data-action="fire"]');
   const kickButtons=document.querySelectorAll('[data-action="kick"]');
+  const blinkButtons=document.querySelectorAll('[data-action="blink"]');
   const nineButtons=document.querySelectorAll('[data-action="nine"]');
 
   if(fireButtons.length){
     const fireReady=player.fireCooldown===0;
     fireButtons.forEach(button=>button.classList.toggle("cooldown",!fireReady));
+  }
+
+  if(blinkButtons.length){
+    const blinkReady=player.blinkCooldown===0;
+    blinkButtons.forEach(button=>button.classList.toggle("cooldown",!blinkReady));
   }
 
   if(kickButtons.length){
@@ -1072,8 +1167,13 @@ function updateAbilityButtons(){
 
   const beamButtons=document.querySelectorAll('[data-action="beam"]');
   if(beamButtons.length){
-    const beamReady=player.beamCooldown===0;
-    beamButtons.forEach(button=>button.classList.toggle("cooldown",!beamReady));
+    beamButtons.forEach(button=>{
+      const usingBlink = player.beamCooldown > 0;
+      const slotReady = usingBlink ? player.blinkCooldown === 0 : player.beamCooldown === 0;
+      button.dataset.action = usingBlink ? "blink" : "beam";
+      button.textContent = usingBlink ? "BLINK" : "BEAM";
+      button.classList.toggle("cooldown", !slotReady);
+    });
   }
 
   if(nineButtons.length){
@@ -1141,7 +1241,7 @@ function fireRasengan(){
     radius:nineTails ? 17 : 13,
     life:90,
     rotation:0,
-    damage:2
+    damage:5
   });
 
   burst(
@@ -1670,6 +1770,18 @@ function updateEnemyProjectiles(){
 function updateBoss(){
   if(boss.hp<=0){
     return;
+  }
+
+  if(boss.blinkCooldown>0){
+    boss.blinkCooldown--;
+  }
+
+  if(boss.blinkFlash>0){
+    boss.blinkFlash--;
+  }
+
+  if(Math.abs(player.x-boss.x)>260 && boss.blinkCooldown===0){
+    triggerBossBlink();
   }
 
   const wasGrounded=boss.grounded;
@@ -3318,12 +3430,14 @@ function showStartMenu(){
   mobilePauseButton.textContent="Ⅱ";
   mobilePauseButton.setAttribute("aria-label","Pause game");
   playAgainButton.classList.remove("visible");
+  updateDifficultyButtons();
   startMenu.classList.remove("hidden");
 }
 
 function startGame(selectedDifficulty){
   difficultyKey=DIFFICULTIES[selectedDifficulty] ? selectedDifficulty : "normal";
   difficulty=DIFFICULTIES[difficultyKey];
+  updateDifficultyButtons();
   startMenu.classList.add("hidden");
   resetGame();
 }
@@ -3504,4 +3618,3 @@ gameLoop();
 </script>
 </body>
 </html>
-
