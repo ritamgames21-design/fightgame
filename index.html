@@ -342,9 +342,9 @@ canvas{
     <h1>NARUTO: SHADOW RUN</h1>
     <p>Choose your challenge before facing Pain.</p>
     <div class="difficulty-list">
-      <button class="difficulty-button" data-difficulty="easy">EASY<small>Same HP · slower Pain</small></button>
-      <button class="difficulty-button active" data-difficulty="normal">NORMAL<small>Same HP · strong Pain</small></button>
-      <button class="difficulty-button" data-difficulty="hard">HARD<small>Same HP · insane Pain</small></button>
+      <button class="difficulty-button" data-difficulty="easy">EASY</button>
+      <button class="difficulty-button active" data-difficulty="normal">NORMAL</button>
+      <button class="difficulty-button" data-difficulty="hard">HARD</button>
     </div>
   </div>
 </div>
@@ -368,9 +368,6 @@ canvas{
       <div class="power-control"><button class="shoulder-button touch-button" data-action="kick" aria-label="Tornado Kick">TORNADO KICK</button></div>
       <div class="power-control"><button class="shoulder-button touch-button" data-action="thunder" aria-label="Thunderstorm">THUNDERSTORM</button></div>
       <div class="power-control"><button class="shoulder-button touch-button" data-action="nine" aria-label="Nine-Tails">NINE-TAILS</button></div>
-    </div>
-    <div class="shoulder-group">
-      <div class="power-control"><button class="shoulder-button touch-button" data-action="beam" aria-label="Beam">BEAM</button></div>
     </div>
   </div>
 </div>
@@ -410,9 +407,9 @@ const PERFORMANCE={
 };
 
 const DIFFICULTIES = {
-  easy: {label:"EASY", fighterHp:150, bossSpeed:1.3, attackDelay:140, projectileDamage:10, projectileSpeed:4.0, powerScale:0.95, enemyPowerScale:0.95, enemyBeamCooldown:260, painThunderDelay:500},
-  normal: {label:"NORMAL", fighterHp:130, bossSpeed:1.9, attackDelay:82, projectileDamage:20, projectileSpeed:5.1, powerScale:1.15, enemyPowerScale:1.4, enemyBeamCooldown:165, painThunderDelay:300},
-  hard: {label:"HARD", fighterHp:120, bossSpeed:2.2, attackDelay:60, projectileDamage:28, projectileSpeed:6.0, powerScale:1.3, enemyPowerScale:1.7, enemyBeamCooldown:115, painThunderDelay:180}
+  easy: {label:"EASY", fighterHp:140, bossHp:140, playerHp:140, bossSpeed:1.3, attackDelay:140, projectileDamage:10, projectileSpeed:4.0, powerScale:0.95, enemyPowerScale:0.95, enemyBeamCooldown:260, painThunderDelay:500},
+  normal: {label:"NORMAL", fighterHp:160, bossHp:160, playerHp:160, bossSpeed:1.9, attackDelay:82, projectileDamage:20, projectileSpeed:5.1, powerScale:1.15, enemyPowerScale:1.4, enemyBeamCooldown:165, painThunderDelay:300},
+  hard: {label:"HARD", fighterHp:200, bossHp:200, playerHp:200, bossSpeed:1.85, attackDelay:88, projectileDamage:22, projectileSpeed:5.6, powerScale:1.3, enemyPowerScale:1.25, enemyBeamCooldown:150, painThunderDelay:260}
 };
 let difficultyKey="normal";
 let difficulty=DIFFICULTIES.normal;
@@ -610,6 +607,7 @@ const boss = {
   beamCooldown:180,
   blinkCooldown:0,
   blinkFlash:0,
+  practiceHidden:false,
   speed:1.8,
   vy:0,
   previousY:0,
@@ -722,6 +720,7 @@ window.addEventListener("keydown",event=>{
     "l",
     "t",
     "h",
+    "p",
     "shift"
   ].includes(key)){
     event.preventDefault();
@@ -761,6 +760,10 @@ window.addEventListener("keydown",event=>{
 
   if(key==="h" && !event.repeat){
     fireKamehameha("player");
+  }
+
+  if(key==="p" && !event.repeat){
+    togglePainPracticeMode();
   }
 
   if(key==="shift" && !event.repeat){
@@ -820,10 +823,10 @@ document.querySelectorAll(".difficulty-button").forEach(button=>{
 
 document.querySelectorAll(".touch-button").forEach(button=>{
   const key=button.dataset.key;
-  const action=button.dataset.action;
 
   button.addEventListener("pointerdown",event=>{
     event.preventDefault();
+    const action=button.dataset.action;
     requestLandscapeMode();
     startBackgroundMusic();
     button.setPointerCapture(event.pointerId);
@@ -942,6 +945,8 @@ function triggerPlayerBlink(){
     return;
   }
 
+  const originX=player.x+player.width/2;
+  const originY=player.y+player.height*.5;
   const dashDistance=180;
   const targetX=clamp(
     player.x + player.direction * dashDistance,
@@ -954,8 +959,10 @@ function triggerPlayerBlink(){
   player.blinkCooldown=200;
   player.blinkFlash=12;
   player.invulnerable=Math.max(player.invulnerable,18);
-  burst(player.x+player.width/2,player.y+player.height*.5,30,"chakra");
-  shake=12;
+  burst(originX,originY,24,"blinkFire");
+  burst(player.x+player.width/2,player.y+player.height*.5,42,"blinkFire");
+  burst(player.x+player.width/2,player.y+player.height*.5,18,"chakra");
+  shake=16;
 }
 
 function triggerBossBlink(){
@@ -977,6 +984,24 @@ function triggerBossBlink(){
   boss.blinkFlash=14;
   burst(boss.x+boss.width/2,boss.y+boss.height*.46,28,"painAttack");
   shake=14;
+}
+
+function togglePainPracticeMode(){
+  if(state!=="playing"){
+    return;
+  }
+
+  boss.practiceHidden=!boss.practiceHidden;
+
+  if(boss.practiceHidden){
+    enemyProjectiles.length=0;
+    thunderStrikes.length=0;
+    for(let index=beamAttacks.length-1;index>=0;index--){
+      if(beamAttacks[index].owner==="boss"){
+        beamAttacks.splice(index,1);
+      }
+    }
+  }
 }
 
 function updatePlayer(){
@@ -1170,7 +1195,7 @@ function updateAbilityButtons(){
     document.querySelectorAll('[data-action="thunder"]').forEach(button=>button.classList.toggle("cooldown",!thunderReady));
   }
 
-  const beamButtons=document.querySelectorAll('[data-action="beam"]');
+  const beamButtons=document.querySelectorAll('[data-action="beam"], [data-action="blink"]');
   if(beamButtons.length){
     beamButtons.forEach(button=>{
       const usingBlink = player.beamCooldown > 0;
@@ -1775,6 +1800,10 @@ function updateEnemyProjectiles(){
 
 function updateBoss(){
   if(boss.hp<=0){
+    return;
+  }
+
+  if(boss.practiceHidden){
     return;
   }
 
@@ -2769,6 +2798,35 @@ function drawPlayer(){
       : "rgba(255,145,40,.22)"
   );
 
+  if(player.blinkFlash>0){
+    const flashProgress=player.blinkFlash/12;
+    ctx.save();
+    ctx.globalAlpha=flashProgress;
+    ctx.lineCap="round";
+    ctx.shadowBlur=24;
+    ctx.shadowColor="#ff4a18";
+    ctx.strokeStyle="#ff6422";
+    ctx.lineWidth=7;
+    ctx.beginPath();
+    ctx.arc(cx,cy,42+(1-flashProgress)*42,0,Math.PI*2);
+    ctx.stroke();
+    ctx.strokeStyle="#ffd166";
+    ctx.lineWidth=3;
+    for(let flame=0;flame<5;flame++){
+      const flameX=cx+(flame-2)*16;
+      ctx.beginPath();
+      ctx.moveTo(flameX,cy+38);
+      ctx.quadraticCurveTo(
+        flameX-10,
+        cy+8-Math.sin(frame*.5+flame)*10,
+        flameX+Math.sin(frame*.4+flame)*8,
+        cy-25
+      );
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   if(player.flying){
     drawFlightEffects(
       x,
@@ -2826,7 +2884,7 @@ function drawPlayer(){
 ------------------------- */
 
 function drawBoss(){
-  if(boss.hp<=0){
+  if(boss.hp<=0 || boss.practiceHidden){
     return;
   }
 
@@ -3187,6 +3245,8 @@ function drawParticles(){
       ctx.fillStyle="#ffb33d";
     }else if(particle.type==="fire"){
       ctx.fillStyle="#ff6a1f";
+    }else if(particle.type==="blinkFire"){
+      ctx.fillStyle=Math.random()>.35 ? "#ff5a1f" : "#ffd166";
     }else if(particle.type==="nineTails"){
       ctx.fillStyle="#ff392b";
     }else if(particle.type==="kick"){
@@ -3451,8 +3511,8 @@ function startGame(selectedDifficulty){
 function resetGame(){
   score=0;
   state="countdown";
-  displayedPlayerHp=difficulty.fighterHp;
-  displayedBossHp=difficulty.fighterHp;
+  displayedPlayerHp=difficulty.playerHp;
+  displayedBossHp=difficulty.bossHp;
   mobilePauseButton.textContent="Ⅱ";
   mobilePauseButton.setAttribute("aria-label","Pause game");
   frame=0;
@@ -3461,8 +3521,7 @@ function resetGame(){
   lastAbilityUiFrame=-30;
   playAgainButton.classList.remove("visible");
 
-  player.hp=player.maxHp;
-  player.maxHp=difficulty.fighterHp;
+  player.maxHp=difficulty.playerHp;
   player.hp=player.maxHp;
   player.vx=0;
   player.vy=0;
@@ -3484,13 +3543,14 @@ function resetGame(){
 
   boss.x=900;
   boss.vx=1.45;
-  boss.maxHp=difficulty.fighterHp;
+  boss.maxHp=difficulty.bossHp;
   boss.hp=boss.maxHp;
   boss.speed=difficulty.bossSpeed;
   boss.hitFlash=0;
   boss.attackCooldown=0;
   boss.thunderCooldown=difficulty.painThunderDelay;
   boss.beamCooldown=180;
+  boss.practiceHidden=false;
   boss.vy=0;
   boss.animationTime=0;
   boss.landSquash=0;
@@ -3506,6 +3566,7 @@ function resetGame(){
   projectiles.length=0;
   fireballs.length=0;
   enemyProjectiles.length=0;
+  beamAttacks.length=0;
   tornadoKicks.length=0;
   thunderStrikes.length=0;
   particles.length=0;
